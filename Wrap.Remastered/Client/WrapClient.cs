@@ -364,11 +364,13 @@ public class WrapClient : IWrapClient, IDisposable
     public void ApproveJoinRoom(int roomId, string userId)
     {
         SendPacket(new RoomJoinApprovePacket(roomId, userId));
+        _pendingJoinUserIds.Remove(userId);
     }
     // 房主拒绝用户加入
     public void RejectJoinRoom(int roomId, string userId)
     {
         SendPacket(new RoomJoinRejectPacket(roomId, userId));
+        _pendingJoinUserIds.Remove(userId);
     }
     // 房主主动转让房主
     public void TransferRoomOwner(int roomId, string newOwnerUserId)
