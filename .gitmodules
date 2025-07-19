@@ -1,0 +1,6 @@
+[submodule "refs/NatTypeTester"]
+	path = refs/NatTypeTester
+	url = https://github.com/HMBSbige/NatTypeTester
+[submodule "refs/ConsoleInteractive"]
+	path = refs/ConsoleInteractive
+	url = https://github.com/breadbyte/ConsoleInteractive
