@@ -17,5 +17,6 @@ public enum ClientBoundPacketType
     RoomJoinResultPacket,
     RoomOwnerChangedPacket,
     RoomDismissedPacket,
-    RoomInfoQueryResultPacket
+    RoomInfoQueryResultPacket,
+    RoomChatMessagePacket
 }

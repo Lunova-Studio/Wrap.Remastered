@@ -4,6 +4,7 @@ using Wrap.Remastered.Client;
 using Wrap.Remastered.Network.Protocol.ClientBound;
 using Wrap.Remastered.Network.Protocol.ServerBound;
 using ConsoleInteractive;
+using System.Linq;
 
 namespace Wrap.Remastered.Commands.Client;
 
@@ -66,6 +67,11 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                     ConsoleWriter.WriteLineFormatted("§c你当前不在任何房间");
                     return;
                 }
+                if (_client.UserId != _client.CurrentRoomInfo.Owner.UserId)
+                {
+                    ConsoleWriter.WriteLineFormatted("§c只有房主才能踢人");
+                    return;
+                }
                 _client.KickUserFromRoom(_client.CurrentRoomInfo.RoomId, args[1]);
                 ConsoleWriter.WriteLineFormatted($"§a已发送踢人请求: {args[1]}");
                 break;
@@ -89,6 +95,11 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                     ConsoleWriter.WriteLineFormatted("§c你当前不在任何房间");
                     return;
                 }
+                if (_client.UserId != _client.CurrentRoomInfo.Owner.UserId)
+                {
+                    ConsoleWriter.WriteLineFormatted("§c只有房主才能审批入群请求");
+                    return;
+                }
                 _client.ApproveJoinRoom(_client.CurrentRoomInfo.RoomId, args[1]);
                 ConsoleWriter.WriteLineFormatted($"§a已同意用户加入: {args[1]}");
                 break;
@@ -101,6 +112,11 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                 if (_client.CurrentRoomInfo == null)
                 {
                     ConsoleWriter.WriteLineFormatted("§c你当前不在任何房间");
+                    return;
+                }
+                if (_client.UserId != _client.CurrentRoomInfo.Owner.UserId)
+                {
+                    ConsoleWriter.WriteLineFormatted("§c只有房主才能审批入群请求");
                     return;
                 }
                 _client.RejectJoinRoom(_client.CurrentRoomInfo.RoomId, args[1]);
@@ -117,6 +133,11 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                     ConsoleWriter.WriteLineFormatted("§c你当前不在任何房间");
                     return;
                 }
+                if (_client.UserId != _client.CurrentRoomInfo.Owner.UserId)
+                {
+                    ConsoleWriter.WriteLineFormatted("§c只有房主才能转让房主");
+                    return;
+                }
                 _client.TransferRoomOwner(_client.CurrentRoomInfo.RoomId, args[1]);
                 ConsoleWriter.WriteLineFormatted($"§a已发送房主转让请求: {args[1]}");
                 break;
@@ -126,8 +147,45 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                     ConsoleWriter.WriteLineFormatted("§c你当前不在任何房间");
                     return;
                 }
+                if (_client.UserId != _client.CurrentRoomInfo.Owner.UserId)
+                {
+                    ConsoleWriter.WriteLineFormatted("§c只有房主才能解散房间");
+                    return;
+                }
                 _client.DismissRoom(_client.CurrentRoomInfo.RoomId);
                 ConsoleWriter.WriteLineFormatted($"§a已发送解散房间请求: {_client.CurrentRoomInfo.RoomId}");
+                break;
+            case "list":
+                if (_client.CurrentRoomInfo == null)
+                {
+                    ConsoleWriter.WriteLineFormatted("§c你当前不在任何房间");
+                    return;
+                }
+                ConsoleWriter.WriteLineFormatted($"§a房间成员列表 (房间ID: {_client.CurrentRoomInfo.RoomId})");
+                foreach (var user in _client.CurrentRoomInfo.Users)
+                {
+                    var ownerMark = user.UserId == _client.CurrentRoomInfo.Owner.UserId ? " §e[房主]" : "";
+                    ConsoleWriter.WriteLineFormatted($"§f{user.DisplayName}{ownerMark}");
+                }
+                break;
+            case "chat":
+                if (_client.CurrentRoomInfo == null)
+                {
+                    ConsoleWriter.WriteLineFormatted("§c你当前不在任何房间");
+                    return;
+                }
+                if (args.Length < 2)
+                {
+                    ConsoleWriter.WriteLineFormatted("§c用法: room chat <消息>");
+                    return;
+                }
+                var msg = string.Join(" ", args.Skip(1));
+                if (string.IsNullOrWhiteSpace(msg))
+                {
+                    ConsoleWriter.WriteLineFormatted("§c消息不能为空");
+                    return;
+                }
+                _client.SendPacket(new RoomChatPacket(_client.CurrentRoomInfo.RoomId, msg));
                 break;
             default:
                 ConsoleWriter.WriteLineFormatted("§c未知子命令: " + sub);
@@ -140,7 +198,8 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
         var list = new List<string>();
         if (args.Length == 1)
         {
-            list.AddRange(new[] { "create", "join", "leave", "kick", "info", "approve", "reject", "transfer", "dismiss" });
+            list.AddRange(new[] { "create", "join", "leave", "kick", "info", "approve", "reject", "transfer", "dismiss", "list", "chat" });
+            list = list.Where(x => x.StartsWith(args[0])).ToList();
         }
         else if (args.Length == 2 && _client.CurrentRoomInfo != null)
         {

@@ -30,5 +30,11 @@ public class RoomTransferOwnerPacketHandler : RoomPacketHandler
         {
             await Server.GetConnectionManager().SendPacketToUserAsync(u.UserId, ownerChangedPacket);
         }
+        // 同步最新房间信息
+        var infoPacket = new RoomInfoPacket(room);
+        foreach (var u in room.Users)
+        {
+            await Server.GetConnectionManager().SendPacketToUserAsync(u.UserId, infoPacket);
+        }
     }
 } 

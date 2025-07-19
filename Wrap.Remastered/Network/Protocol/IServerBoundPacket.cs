@@ -22,7 +22,8 @@ public interface IServerBoundPacket : IPacket
         { ServerBoundPacketType.RoomKickPacket, new RoomKickPacketSerializer() },
         { ServerBoundPacketType.RoomJoinRejectPacket, new RoomJoinRejectPacketSerializer() },
         { ServerBoundPacketType.RoomTransferOwnerPacket, new RoomTransferOwnerPacketSerializer() },
-        { ServerBoundPacketType.RoomDismissPacket, new RoomDismissPacketSerializer() }
+        { ServerBoundPacketType.RoomDismissPacket, new RoomDismissPacketSerializer() },
+        { ServerBoundPacketType.RoomChatPacket, new RoomChatPacketSerializer() }
     };
 
     ServerBoundPacketType GetPacketType();

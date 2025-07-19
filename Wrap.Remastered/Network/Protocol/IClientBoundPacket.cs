@@ -22,7 +22,8 @@ public interface IClientBoundPacket : IPacket
         { ClientBoundPacketType.RoomJoinResultPacket, new RoomJoinResultPacketSerializer() },
         { ClientBoundPacketType.RoomOwnerChangedPacket, new RoomOwnerChangedPacketSerializer() },
         { ClientBoundPacketType.RoomDismissedPacket, new RoomDismissedPacketSerializer() },
-        { ClientBoundPacketType.RoomInfoQueryResultPacket, new RoomInfoQueryResultPacketSerializer() }
+        { ClientBoundPacketType.RoomInfoQueryResultPacket, new RoomInfoQueryResultPacketSerializer() },
+        { ClientBoundPacketType.RoomChatMessagePacket, new RoomChatMessagePacketSerializer() }
     };
 
     ClientBoundPacketType GetPacketType();

@@ -217,7 +217,8 @@ public class PacketHandlerFactory : IPacketHandlerFactory
             { (int)ServerBoundPacketType.RoomKickPacket, new RoomKickPacketHandler(server) },
             { (int)ServerBoundPacketType.RoomJoinRejectPacket, new RoomJoinRejectPacketHandler(server) },
             { (int)ServerBoundPacketType.RoomTransferOwnerPacket, new RoomTransferOwnerPacketHandler(server) },
-            { (int)ServerBoundPacketType.RoomDismissPacket, new RoomDismissPacketHandler(server) }
+            { (int)ServerBoundPacketType.RoomDismissPacket, new RoomDismissPacketHandler(server) },
+            { (int)ServerBoundPacketType.RoomChatPacket, new RoomChatPacketHandler(server) }
         };
     }
 

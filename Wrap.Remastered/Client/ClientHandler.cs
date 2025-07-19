@@ -149,6 +149,11 @@ public class ClientHandler : ChannelHandlerAdapter
                     {
                         _client.OnRoomJoinResult(joinResultPacket);
                     }
+                    // 处理房间聊天消息
+                    else if (packet is RoomChatMessagePacket chatMsgPacket)
+                    {
+                        _client.OnRoomChatMessageReceived(chatMsgPacket);
+                    }
                 }
             }
         }

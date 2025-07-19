@@ -18,5 +18,6 @@ public enum ServerBoundPacketType
     RoomKickPacket,
     RoomJoinRejectPacket,
     RoomTransferOwnerPacket,
-    RoomDismissPacket
+    RoomDismissPacket,
+    RoomChatPacket
 }

@@ -46,6 +46,7 @@ public class WrapClient : IWrapClient, IDisposable
     public event EventHandler<RoomJoinResultPacket>? RoomKickResultReceived;
     private readonly List<string> _pendingJoinUserIds = new();
     public IReadOnlyList<string> PendingJoinUserIds => _pendingJoinUserIds.AsReadOnly();
+    public event EventHandler<RoomChatMessagePacket>? RoomChatMessageReceived;
 
     public bool Disposed => _disposed;
     public bool IsConnected => _isConnected && _clientChannel?.Active == true;
@@ -355,6 +356,12 @@ public class WrapClient : IWrapClient, IDisposable
             ConsoleWriter.WriteLine($"[房间] 申请加入房间{packet.RoomId}结果: {(packet.Success ? "成功" : "失败")}，消息: {packet.Message}");
         }
     }
+    internal void OnRoomChatMessageReceived(RoomChatMessagePacket packet)
+    {
+        RoomChatMessageReceived?.Invoke(this, packet);
+        var time = packet.Timestamp.ToLocalTime().ToString("HH:mm:ss");
+        ConsoleWriter.WriteLineFormatted($"§b[{time}] §a{packet.SenderDisplayName}§f: {packet.Message}");
+    }
     // 申请加入房间
     public void RequestJoinRoom(int roomId)
     {
@@ -364,11 +371,13 @@ public class WrapClient : IWrapClient, IDisposable
     public void ApproveJoinRoom(int roomId, string userId)
     {
         SendPacket(new RoomJoinApprovePacket(roomId, userId));
+        _pendingJoinUserIds.Remove(userId);
     }
     // 房主拒绝用户加入
     public void RejectJoinRoom(int roomId, string userId)
     {
         SendPacket(new RoomJoinRejectPacket(roomId, userId));
+        _pendingJoinUserIds.Remove(userId);
     }
     // 房主主动转让房主
     public void TransferRoomOwner(int roomId, string newOwnerUserId)
