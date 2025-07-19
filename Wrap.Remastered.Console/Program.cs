@@ -29,10 +29,34 @@ class Program
             client.Connected += OnClientConnected;
             client.Disconnected += OnClientDisconnected;
 
-            // 注册命令输入处理
+            // 注册命令输入处理（支持Tab补全）
             ConsoleReader.MessageReceived += (sender, command) =>
             {
                 commandManager.ExecuteCommand(command);
+            };
+
+            ConsoleReader.OnInputChange += (sender, e) =>
+            {
+                if (e.Text == string.Empty)
+                {
+                    ConsoleSuggestion.ClearSuggestions();
+                    return;
+                }
+                IList<string>? strings = commandManager.Complete(e.Text.TrimStart());
+                ConsoleSuggestion.ClearSuggestions();
+                List<ConsoleSuggestion.Suggestion> suggestions = new();
+                foreach (string s in strings)
+                {
+                    ConsoleSuggestion.Suggestion suggestion = new(s);
+                    suggestions.Add(suggestion);
+                }
+                int offset = 0;
+                int offset2 = e.Text.Length;
+                if (e.Text.LastIndexOf(" ") != -1)
+                {
+                    offset = e.Text.LastIndexOf(" ") + 1;
+                }
+                ConsoleSuggestion.UpdateSuggestions(suggestions.ToArray(), new(offset, offset2));
             };
 
             // 保持程序运行

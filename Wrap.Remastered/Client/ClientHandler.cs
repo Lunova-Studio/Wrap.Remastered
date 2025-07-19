@@ -119,6 +119,36 @@ public class ClientHandler : ChannelHandlerAdapter
                     {
                         _client.OnDisconnectPacketReceived(disconnectPacket);
                     }
+                    // 处理房间信息包
+                    else if (packet is RoomInfoPacket roomInfoPacket)
+                    {
+                        _client.OnRoomInfoReceived(roomInfoPacket);
+                    }
+                    // 处理房主变更通知
+                    else if (packet is RoomOwnerChangedPacket ownerChangedPacket)
+                    {
+                        _client.OnRoomOwnerChanged(ownerChangedPacket);
+                    }
+                    // 处理房间解散通知
+                    else if (packet is RoomDismissedPacket dismissedPacket)
+                    {
+                        _client.OnRoomDismissed(dismissedPacket);
+                    }
+                    // 处理房间信息查询结果
+                    else if (packet is RoomInfoQueryResultPacket infoQueryResultPacket)
+                    {
+                        _client.OnRoomInfoQueryResult(infoQueryResultPacket);
+                    }
+                    // 处理房间申请通知
+                    else if (packet is RoomJoinRequestNoticePacket joinRequestNoticePacket)
+                    {
+                        _client.OnRoomJoinRequestNotice(joinRequestNoticePacket);
+                    }
+                    // 处理房间申请结果
+                    else if (packet is RoomJoinResultPacket joinResultPacket)
+                    {
+                        _client.OnRoomJoinResult(joinResultPacket);
+                    }
                 }
             }
         }

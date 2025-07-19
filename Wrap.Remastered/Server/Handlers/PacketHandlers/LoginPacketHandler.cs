@@ -18,7 +18,7 @@ public class LoginPacketHandler : BasePacketHandler
 
     }
 
-    protected override void OnHandle(IChannel channel, UnsolvedPacket packet)
+    public override async Task OnHandleAsync(IChannel channel, UnsolvedPacket packet)
     {
         try
         {
@@ -27,7 +27,7 @@ public class LoginPacketHandler : BasePacketHandler
             if (loginPacket == null)
             {
                 Server.GetLoggingService().LogError("Packet", "登录数据包反序列化失败", null, "通道: {0}", channel.RemoteAddress);
-                SendLoginFailedResponse(channel, "INVALID_PACKET", "数据包格式错误");
+                await SendLoginFailedResponse(channel, "INVALID_PACKET", "数据包格式错误");
                 return;
             }
 
@@ -50,19 +50,19 @@ public class LoginPacketHandler : BasePacketHandler
             Server.GetLoggingService().LogUser("用户登录成功: {0} (ID: {1})", serverUserInfo.DisplayName, serverUserInfo.UserId);
 
             // 发送登录成功响应
-            SendLoginSucceedResponse(channel, serverUserInfo);
+            await SendLoginSucceedResponse(channel, serverUserInfo);
         }
         catch (Exception ex)
         {
             Server.GetLoggingService().LogError("User", "处理登录请求时发生错误", ex);
-            SendLoginFailedResponse(channel, "SERVER_ERROR", "服务器内部错误");
+            await SendLoginFailedResponse(channel, "SERVER_ERROR", "服务器内部错误");
         }
     }
 
     /// <summary>
     /// 发送登录成功响应
     /// </summary>
-    private void SendLoginSucceedResponse(IChannel channel, UserInfo userInfo)
+    private async Task SendLoginSucceedResponse(IChannel channel, UserInfo userInfo)
     {
         try
         {
@@ -74,7 +74,7 @@ public class LoginPacketHandler : BasePacketHandler
                 LoginTime = DateTime.UtcNow
             };
 
-            SendPacketAsync(channel, loginSucceedPacket).Wait();
+            await SendPacketAsync(channel, loginSucceedPacket);
             Server.GetLoggingService().LogUser("已发送登录成功响应给用户: {0}", userInfo.DisplayName);
         }
         catch (Exception ex)
@@ -86,7 +86,7 @@ public class LoginPacketHandler : BasePacketHandler
     /// <summary>
     /// 发送登录失败响应
     /// </summary>
-    private void SendLoginFailedResponse(IChannel channel, string errorCode, string errorMessage)
+    private async Task SendLoginFailedResponse(IChannel channel, string errorCode, string errorMessage)
     {
         try
         {
@@ -97,7 +97,7 @@ public class LoginPacketHandler : BasePacketHandler
                 FailTime = DateTime.UtcNow
             };
 
-            SendPacketAsync(channel, loginFailedPacket).Wait();
+            await SendPacketAsync(channel, loginFailedPacket);
             Server.GetLoggingService().LogUser("已发送登录失败响应: {0} - {1}", errorCode, errorMessage);
         }
         catch (Exception ex)
@@ -109,7 +109,7 @@ public class LoginPacketHandler : BasePacketHandler
     /// <summary>
     /// 发送断开连接包（踢出/服务器关闭等）
     /// </summary>
-    public void SendDisconnectPacket(IChannel channel, string reason)
+    public async Task SendDisconnectPacket(IChannel channel, string reason)
     {
         try
         {
@@ -118,7 +118,7 @@ public class LoginPacketHandler : BasePacketHandler
                 Reason = reason,
                 DisconnectTime = DateTime.UtcNow
             };
-            SendPacketAsync(channel, disconnectPacket).Wait();
+            await SendPacketAsync(channel, disconnectPacket);
             Server.GetLoggingService().LogUser("已发送断开连接包: {0}", reason);
         }
         catch (Exception ex)
@@ -129,6 +129,13 @@ public class LoginPacketHandler : BasePacketHandler
 
     private async Task SendPacketAsync(IChannel channel, IClientBoundPacket packet)
     {
-        
+        var serializer = packet.GetSerializer();
+        var data = serializer.Serialize(packet);
+        packet.OnSerialize(ref data);
+        var packetData = new byte[4 + data.Length];
+        BitConverter.GetBytes((int)packet.GetPacketType()).CopyTo(packetData, 0);
+        data.CopyTo(packetData, 4);
+        var buffer = DotNetty.Buffers.Unpooled.WrappedBuffer(packetData);
+        await channel.WriteAndFlushAsync(buffer);
     }
 }

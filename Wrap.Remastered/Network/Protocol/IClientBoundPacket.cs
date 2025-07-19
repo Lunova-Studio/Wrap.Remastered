@@ -15,7 +15,14 @@ public interface IClientBoundPacket : IPacket
     {
         { ClientBoundPacketType.LoginSucceedPacket, new LoginSucceedPacketSerializer() },
         { ClientBoundPacketType.LoginFailedPacket, new LoginFailedPacketSerializer() },
-        { ClientBoundPacketType.DisconnectPacket, new DisconnectPacketSerializer() }
+        { ClientBoundPacketType.DisconnectPacket, new DisconnectPacketSerializer() },
+        { ClientBoundPacketType.RoomInfoPacket, new RoomInfoPacketSerializer() },
+        { ClientBoundPacketType.UserInfoResultPacket, new UserInfoResultPacketSerializer() },
+        { ClientBoundPacketType.RoomJoinRequestNoticePacket, new RoomJoinRequestNoticePacketSerializer() },
+        { ClientBoundPacketType.RoomJoinResultPacket, new RoomJoinResultPacketSerializer() },
+        { ClientBoundPacketType.RoomOwnerChangedPacket, new RoomOwnerChangedPacketSerializer() },
+        { ClientBoundPacketType.RoomDismissedPacket, new RoomDismissedPacketSerializer() },
+        { ClientBoundPacketType.RoomInfoQueryResultPacket, new RoomInfoQueryResultPacketSerializer() }
     };
 
     ClientBoundPacketType GetPacketType();

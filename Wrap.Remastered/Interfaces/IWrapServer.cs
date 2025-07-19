@@ -2,6 +2,7 @@
 using Wrap.Remastered.Server.Events;
 using Wrap.Remastered.Server.Handlers;
 using Wrap.Remastered.Server.Services;
+using Wrap.Remastered.Server.Managers;
 
 namespace Wrap.Remastered.Interfaces;
 
@@ -94,4 +95,6 @@ public interface IWrapServer : IDisposable
     IConnectionManager GetConnectionManager();
 
     LoggingService GetLoggingService();
+
+    RoomManager GetRoomManager();
 }

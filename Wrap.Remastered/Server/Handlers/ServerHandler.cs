@@ -95,7 +95,7 @@ public class ServerHandler : ChannelHandlerAdapter
                 }
 
                 // 读取数据包类型（4字节）
-                int packetType = buffer.ReadInt();
+                int packetType = buffer.ReadIntLE();
 
                 // 读取剩余的数据部分
                 var data = new byte[buffer.ReadableBytes];
@@ -107,7 +107,7 @@ public class ServerHandler : ChannelHandlerAdapter
                 var unsolvedPacket = new UnsolvedPacket(packetType, data);
 
                 // 处理接收到的数据包
-                ProcessReceivedPacket(context.Channel, unsolvedPacket);
+                _ = ProcessReceivedPacket(context.Channel, unsolvedPacket);
             }
         }
         catch (ObjectDisposedException)
@@ -146,7 +146,7 @@ public class ServerHandler : ChannelHandlerAdapter
     /// </summary>
     /// <param name="channel">通道</param>
     /// <param name="packet">数据包</param>
-    private void ProcessReceivedPacket(IChannel channel, UnsolvedPacket packet)
+    private async Task ProcessReceivedPacket(IChannel channel, UnsolvedPacket packet)
     {
         try
         {
@@ -160,7 +160,7 @@ public class ServerHandler : ChannelHandlerAdapter
             var handler = _packetHandlerFactory.GetHandler(packet.PacketType);
             if (handler != null)
             {
-                handler.Handle(channel, packet);
+                await handler.OnHandleAsync(channel, packet);
             }
             else
             {
@@ -176,19 +176,6 @@ public class ServerHandler : ChannelHandlerAdapter
             _server.GetLoggingService().LogError("Packet", "处理数据包时发生错误", ex, "通道: {0}", channel.RemoteAddress);
         }
     }
-}
-
-/// <summary>
-/// 数据包处理器接口
-/// </summary>
-public interface IPacketHandler
-{
-    /// <summary>
-    /// 处理数据包
-    /// </summary>
-    /// <param name="channel">通道</param>
-    /// <param name="packet">数据包</param>
-    void Handle(IChannel channel, UnsolvedPacket packet);
 }
 
 /// <summary>
@@ -220,7 +207,17 @@ public class PacketHandlerFactory : IPacketHandlerFactory
 
         _handlers = new Dictionary<int, IPacketHandler>
         {
-            { (int)ServerBoundPacketType.LoginPacket, new LoginPacketHandler(server) }
+            { (int)ServerBoundPacketType.LoginPacket, new LoginPacketHandler(server) },
+            { (int)ServerBoundPacketType.RoomCreateRequestPacket, new RoomCreateRequestPacketHandler(server) },
+            { (int)ServerBoundPacketType.UserInfoQueryPacket, new UserInfoQueryPacketHandler(server) },
+            { (int)ServerBoundPacketType.RoomJoinRequestPacket, new RoomJoinRequestPacketHandler(server) },
+            { (int)ServerBoundPacketType.RoomJoinApprovePacket, new RoomJoinApprovePacketHandler(server) },
+            { (int)ServerBoundPacketType.RoomLeavePacket, new RoomLeavePacketHandler(server) },
+            { (int)ServerBoundPacketType.RoomInfoQueryPacket, new RoomInfoQueryPacketHandler(server) },
+            { (int)ServerBoundPacketType.RoomKickPacket, new RoomKickPacketHandler(server) },
+            { (int)ServerBoundPacketType.RoomJoinRejectPacket, new RoomJoinRejectPacketHandler(server) },
+            { (int)ServerBoundPacketType.RoomTransferOwnerPacket, new RoomTransferOwnerPacketHandler(server) },
+            { (int)ServerBoundPacketType.RoomDismissPacket, new RoomDismissPacketHandler(server) }
         };
     }
 
@@ -287,9 +284,11 @@ public interface IConnectionManager
 
     IEnumerable<ChannelConnection> GetAllConnections();
 
-    bool DisconnectUser(string userId, string? reason = null);
+    Task<bool> DisconnectUserAsync(string userId, string? reason = null);
 
     ConnectionStatistics GetStatistics();
 
     Task<int> BroadcastToUsersAsync(byte[] data, string? excludeUserId = null);
+
+    Task<bool> SendPacketToUserAsync(string userId, IClientBoundPacket packet);
 }

@@ -10,5 +10,12 @@ public enum ClientBoundPacketType
 {
     LoginSucceedPacket,
     LoginFailedPacket,
-    DisconnectPacket
+    DisconnectPacket,
+    RoomInfoPacket,
+    UserInfoResultPacket,
+    RoomJoinRequestNoticePacket,
+    RoomJoinResultPacket,
+    RoomOwnerChangedPacket,
+    RoomDismissedPacket,
+    RoomInfoQueryResultPacket
 }

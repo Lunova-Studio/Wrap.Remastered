@@ -29,6 +29,7 @@ public class WrapServer : IWrapServer, IDisposable
     private DotNettyConnectionManager? _connectionManager;
     private CommandManager _commandManager;
     private LoggingService _loggingService;
+    private RoomManager _roomManager = new RoomManager();
 
 
     private CancellationTokenSource? _statisticsCancellationTokenSource;
@@ -262,8 +263,11 @@ public class WrapServer : IWrapServer, IDisposable
         CheckDisposed();
         if (_connectionManager == null)
             return false;
-
-        var success = _connectionManager.DisconnectUser(clientId, reason);
+        if (_connectionManager is DotNettyConnectionManager dotNettyConnMgr)
+        {
+            return await dotNettyConnMgr.DisconnectUserAsync(clientId, reason);
+        }
+        var success = await _connectionManager.DisconnectUserAsync(clientId, reason);
         return await Task.FromResult(success);
     }
 
@@ -282,6 +286,16 @@ public class WrapServer : IWrapServer, IDisposable
     private void OnClientDisconnected(object? sender, ChannelConnectionEventArgs e)
     {
         var clientId = e.Connection.UserId ?? e.Connection.RemoteAddress;
+        // 用户断开时自动退出房间
+        if (!string.IsNullOrEmpty(e.Connection.UserId))
+        {
+            var userId = e.Connection.UserId;
+            var roomId = _roomManager.GetUserRoomId(userId);
+            if (roomId.HasValue)
+            {
+                _roomManager.RemoveUserFromRoom(roomId.Value, userId);
+            }
+        }
         ClientDisconnected?.Invoke(this, new ClientDisconnectedEventArgs(clientId));
     }
 
@@ -370,6 +384,11 @@ public class WrapServer : IWrapServer, IDisposable
     public LoggingService GetLoggingService()
     {
         return _loggingService;
+    }
+
+    public RoomManager GetRoomManager()
+    {
+        return _roomManager;
     }
 }
 

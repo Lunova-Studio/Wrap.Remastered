@@ -30,17 +30,10 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
     private volatile bool _disposed = false;
     private readonly IWrapServer _server;
 
-    /// <summary>
-    /// 连接事件
-    /// </summary>
     public event EventHandler<ChannelConnectionEventArgs>? ClientConnected;
     public event EventHandler<ChannelConnectionEventArgs>? ClientDisconnected;
     public event EventHandler<ChannelDataEventArgs>? DataReceived;
 
-    /// <summary>
-    /// 构造函数
-    /// </summary>
-    /// <param name="cleanupInterval">清理间隔（毫秒）</param>
     public DotNettyConnectionManager(IWrapServer server, int cleanupInterval = 30000)
     {
         _server = server;
@@ -340,7 +333,7 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
     /// </summary>
     /// <param name="userId">用户ID</param>
     /// <returns>是否成功断开</returns>
-    public bool DisconnectUser(string userId, string? reason = null)
+    public async Task<bool> DisconnectUserAsync(string userId, string? reason = null)
     {
         CheckDisposed();
 
@@ -349,7 +342,7 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
 
         if (_userConnections.TryRemove(userId, out var connection))
         {
-            connection.SendPacketAsync(new DisconnectPacket(reason)).Wait();
+            await connection.SendPacketAsync(new DisconnectPacket(reason));
             connection.Close();
             return true;
         }

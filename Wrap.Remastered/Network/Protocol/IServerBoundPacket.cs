@@ -12,7 +12,17 @@ public interface IServerBoundPacket : IPacket
 {
     public static Dictionary<ServerBoundPacketType, ISerializer<IPacket>> Serializers = new()
     {
-        { ServerBoundPacketType.LoginPacket, new LoginPacketSerializer() }
+        { ServerBoundPacketType.LoginPacket, new LoginPacketSerializer() },
+        { ServerBoundPacketType.RoomCreateRequestPacket, new RoomCreateRequestPacketSerializer() },
+        { ServerBoundPacketType.UserInfoQueryPacket, new UserInfoQueryPacketSerializer() },
+        { ServerBoundPacketType.RoomJoinRequestPacket, new RoomJoinRequestPacketSerializer() },
+        { ServerBoundPacketType.RoomJoinApprovePacket, new RoomJoinApprovePacketSerializer() },
+        { ServerBoundPacketType.RoomLeavePacket, new RoomLeavePacketSerializer() },
+        { ServerBoundPacketType.RoomInfoQueryPacket, new RoomInfoQueryPacketSerializer() },
+        { ServerBoundPacketType.RoomKickPacket, new RoomKickPacketSerializer() },
+        { ServerBoundPacketType.RoomJoinRejectPacket, new RoomJoinRejectPacketSerializer() },
+        { ServerBoundPacketType.RoomTransferOwnerPacket, new RoomTransferOwnerPacketSerializer() },
+        { ServerBoundPacketType.RoomDismissPacket, new RoomDismissPacketSerializer() }
     };
 
     ServerBoundPacketType GetPacketType();

@@ -1,0 +1,42 @@
+using DotNetty.Transport.Channels;
+using Wrap.Remastered.Network.Protocol;
+using Wrap.Remastered.Network.Protocol.ServerBound;
+using Wrap.Remastered.Network.Protocol.ClientBound;
+using Wrap.Remastered.Schemas;
+using Wrap.Remastered.Server.Managers;
+using Wrap.Remastered.Interfaces;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Wrap.Remastered.Server.Handlers.PacketHandlers;
+
+public class RoomJoinApprovePacketHandler : RoomPacketHandler
+{
+    public RoomJoinApprovePacketHandler(IWrapServer server) : base(server) { }
+
+    public override async Task OnHandleAsync(IChannel channel, UnsolvedPacket packet)
+    {
+        var req = RoomJoinApprovePacket.Serializer.Deserialize(packet.Data) as RoomJoinApprovePacket;
+        if (req == null) return;
+        var room = RoomManager.GetRoom(req.RoomId);
+        if (room == null) return;
+        var user = Server.GetConnectionManager().GetAllUserConnections().FirstOrDefault(c => c.UserInfo.UserId == req.UserId)?.UserInfo;
+        if (user == null) return;
+        // 只有房主能同意
+        var ownerConn = Server.GetConnectionManager().GetAllUserConnections().FirstOrDefault(c => c.Channel == channel);
+        if (ownerConn == null || room.Owner.UserId != ownerConn.UserInfo.UserId) return;
+        var success = RoomManager.AddUserToRoom(room.Id, user);
+        // 通知申请者结果
+        var result = new RoomJoinResultPacket(room.Id, success, success ? "加入房间成功" : "加入房间失败");
+        await Server.GetConnectionManager().SendPacketToUserAsync(user.UserId, result);
+        // 广播成员变动
+        if (success)
+        {
+            var infoPacket = new RoomInfoPacket(room);
+            foreach (var u in room.Users)
+            {
+                await Server.GetConnectionManager().SendPacketToUserAsync(u.UserId, infoPacket);
+            }
+        }
+    }
+} 

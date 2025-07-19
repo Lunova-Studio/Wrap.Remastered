@@ -8,5 +8,15 @@ namespace Wrap.Remastered.Network.Protocol.ServerBound;
 
 public enum ServerBoundPacketType
 {
-    LoginPacket
+    LoginPacket,
+    RoomCreateRequestPacket,
+    UserInfoQueryPacket,
+    RoomJoinRequestPacket,
+    RoomJoinApprovePacket,
+    RoomLeavePacket,
+    RoomInfoQueryPacket,
+    RoomKickPacket,
+    RoomJoinRejectPacket,
+    RoomTransferOwnerPacket,
+    RoomDismissPacket
 }

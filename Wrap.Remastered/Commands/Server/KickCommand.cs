@@ -35,7 +35,7 @@ public class KickCommand : CommandBase, ICommandTabCompleter
 
         var userId = args[0];
         var reason = args.Length > 1 ? string.Join(" ", args.Skip(1)) : "被管理员踢出";
-        var success = _server.GetConnectionManager().DisconnectUser(userId, reason);
+        var success = _server.GetConnectionManager().DisconnectUserAsync(userId, reason).GetAwaiter().GetResult();
 
         if (success)
         {
@@ -49,15 +49,31 @@ public class KickCommand : CommandBase, ICommandTabCompleter
 
     public IList<string> OnComplete(string[] args)
     {
+        // 支持kick <房间ID> <用户ID> 或 kick <用户ID>
+        var list = new List<string>();
         if (args.Length == 1)
         {
+            // 优先补全在线用户ID
             var connections = _server.GetConnectionManager().GetAllUserConnections();
-            return connections
-                .Where(c => c.UserInfo != null)
-                .Select(c => c.UserInfo!.UserId)
-                .ToList();
+            list.AddRange(connections.Where(c => c.UserInfo != null).Select(c => c.UserInfo!.UserId));
+            // 如果有RoomManager，补全房间ID
+            if (_server.GetRoomManager() is { } roomMgr)
+            {
+                list.AddRange(roomMgr.GetAllRooms().Select(r => r.Id.ToString()));
+            }
         }
-
-        return new List<string>();
+        else if (args.Length == 2)
+        {
+            // 如果第一个参数是房间ID，补全该房间内用户ID
+            if (int.TryParse(args[0], out var roomId) && _server.GetRoomManager() is { } roomMgr)
+            {
+                var room = roomMgr.GetRoom(roomId);
+                if (room != null)
+                {
+                    list.AddRange(room.Users.Select(u => u.UserId));
+                }
+            }
+        }
+        return list;
     }
 } 

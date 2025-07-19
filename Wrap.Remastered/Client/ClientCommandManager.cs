@@ -34,10 +34,12 @@ public class ClientCommandManager
         _commandManager.RegisterCommandExecuter(new HelpCommand(_commandManager));
         _commandManager.RegisterCommandExecuter(new SetNameCommand(_client));
         _commandManager.RegisterCommandExecuter(new SetDisplayNameCommand(_client));
+        _commandManager.RegisterCommandExecuter(new RoomCommand(_client));
 
         // 注册标签页补全器
         _commandManager.RegisterCommandTabCompleter(new ConnectCommand(_client));
         _commandManager.RegisterCommandTabCompleter(new HelpCommand(_commandManager));
+        _commandManager.RegisterCommandTabCompleter(new RoomCommand(_client));
     }
 
     /// <summary>
@@ -64,7 +66,7 @@ public class ClientCommandManager
     /// </summary>
     /// <param name="commandLine">命令行</param>
     /// <returns>补全选项列表</returns>
-    public System.Collections.Generic.IList<string> GetCompletions(string commandLine)
+    public System.Collections.Generic.IList<string> Complete(string commandLine)
     {
         return _commandManager.Complete(commandLine);
     }

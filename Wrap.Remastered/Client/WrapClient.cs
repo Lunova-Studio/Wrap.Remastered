@@ -18,6 +18,7 @@ using Wrap.Remastered.Network.Protocol.ServerBound;
 using System.Net.Sockets;
 using Wrap.Remastered.Network.Protocol.ClientBound;
 using Wrap.Remastered.Client;
+using ConsoleInteractive;
 
 namespace Wrap.Remastered.Client;
 
@@ -30,6 +31,21 @@ public class WrapClient : IWrapClient, IDisposable
     private volatile bool _disposed = false;
     private volatile bool _isLoggedIn = false;
     private UserProfile _profile = UserProfile.Load();
+    public RoomInfoPacket? CurrentRoomInfo { get; private set; }
+    public event EventHandler<RoomInfoPacket>? RoomInfoReceived;
+    public event EventHandler<RoomOwnerChangedPacket>? RoomOwnerChanged;
+    public event EventHandler<RoomDismissedPacket>? RoomDismissed;
+    public event EventHandler<RoomInfoQueryResultPacket>? RoomInfoQueryResultReceived;
+    public RoomOwnerChangedPacket? LastRoomOwnerChanged { get; private set; }
+    public RoomDismissedPacket? LastRoomDismissed { get; private set; }
+    public RoomInfoQueryResultPacket? LastRoomInfoQueryResult { get; private set; }
+    public event EventHandler<RoomJoinRequestNoticePacket>? RoomJoinRequestNoticeReceived;
+    public event EventHandler<RoomJoinResultPacket>? RoomJoinResultReceived;
+    public RoomJoinRequestNoticePacket? LastRoomJoinRequestNotice { get; private set; }
+    public RoomJoinResultPacket? LastRoomJoinResult { get; private set; }
+    public event EventHandler<RoomJoinResultPacket>? RoomKickResultReceived;
+    private readonly List<string> _pendingJoinUserIds = new();
+    public IReadOnlyList<string> PendingJoinUserIds => _pendingJoinUserIds.AsReadOnly();
 
     public bool Disposed => _disposed;
     public bool IsConnected => _isConnected && _clientChannel?.Active == true;
@@ -284,6 +300,92 @@ public class WrapClient : IWrapClient, IDisposable
 
         _ = DisconnectAsync();
     }
+
+    internal void OnRoomInfoReceived(RoomInfoPacket packet)
+    {
+        CurrentRoomInfo = packet;
+        RoomInfoReceived?.Invoke(this, packet);
+        ConsoleWriter.WriteLine($"[房间] 加入房间: {packet.RoomName} (ID: {packet.RoomId})，房主: {packet.Owner.DisplayName}，成员数: {packet.Users.Count}/{packet.MaxUsers}");
+    }
+
+    internal void OnRoomOwnerChanged(RoomOwnerChangedPacket packet)
+    {
+        LastRoomOwnerChanged = packet;
+        RoomOwnerChanged?.Invoke(this, packet);
+        ConsoleWriter.WriteLine($"[房间] 房主已变更，房间ID: {packet.RoomId}，新房主UserId: {packet.NewOwnerUserId}");
+    }
+    internal void OnRoomDismissed(RoomDismissedPacket packet)
+    {
+        if (CurrentRoomInfo != null && CurrentRoomInfo.RoomId == packet.RoomId)
+        {
+            CurrentRoomInfo = null;
+        }
+        LastRoomDismissed = packet;
+        RoomDismissed?.Invoke(this, packet);
+        ConsoleWriter.WriteLine($"[房间] 房间已解散，房间ID: {packet.RoomId}");
+    }
+    internal void OnRoomInfoQueryResult(RoomInfoQueryResultPacket packet)
+    {
+        LastRoomInfoQueryResult = packet;
+        RoomInfoQueryResultReceived?.Invoke(this, packet);
+        ConsoleWriter.WriteLine($"[房间] 查询结果：房间ID: {packet.RoomId}，名称: {packet.RoomName}，房主: {packet.OwnerUserId}，人数: {packet.UserCount}/{packet.MaxUsers}");
+    }
+    internal void OnRoomJoinRequestNotice(RoomJoinRequestNoticePacket packet)
+    {
+        LastRoomJoinRequestNotice = packet;
+        if (!string.IsNullOrEmpty(packet.ApplicantUserId) && !_pendingJoinUserIds.Contains(packet.ApplicantUserId))
+        {
+            _pendingJoinUserIds.Add(packet.ApplicantUserId);
+        }
+        RoomJoinRequestNoticeReceived?.Invoke(this, packet);
+        ConsoleWriter.WriteLine($"[房间] 有用户申请加入房间，房间ID: {packet.RoomId}，申请者UserId: {packet.ApplicantUserId}");
+    }
+    internal void OnRoomJoinResult(RoomJoinResultPacket packet)
+    {
+        LastRoomJoinResult = packet;
+        RoomJoinResultReceived?.Invoke(this, packet);
+        // 踢人结果：如果是失败且消息包含“踢出”，则触发踢人结果事件
+        if (!packet.Success && packet.Message.Contains("踢出"))
+        {
+            RoomKickResultReceived?.Invoke(this, packet);
+            ConsoleWriter.WriteLine($"[房间] 你被房主踢出了房间 (ID: {packet.RoomId})");
+        }
+        else
+        {
+            ConsoleWriter.WriteLine($"[房间] 申请加入房间{packet.RoomId}结果: {(packet.Success ? "成功" : "失败")}，消息: {packet.Message}");
+        }
+    }
+    // 申请加入房间
+    public void RequestJoinRoom(int roomId)
+    {
+        SendPacket(new RoomJoinRequestPacket(roomId));
+    }
+    // 房主审批同意用户加入
+    public void ApproveJoinRoom(int roomId, string userId)
+    {
+        SendPacket(new RoomJoinApprovePacket(roomId, userId));
+    }
+    // 房主拒绝用户加入
+    public void RejectJoinRoom(int roomId, string userId)
+    {
+        SendPacket(new RoomJoinRejectPacket(roomId, userId));
+    }
+    // 房主主动转让房主
+    public void TransferRoomOwner(int roomId, string newOwnerUserId)
+    {
+        SendPacket(new RoomTransferOwnerPacket(roomId, newOwnerUserId));
+    }
+    // 房主主动解散房间
+    public void DismissRoom(int roomId)
+    {
+        SendPacket(new RoomDismissPacket(roomId));
+    }
+    // 踢人（房主主动调用）
+    public void KickUserFromRoom(int roomId, string userId)
+    {
+        SendPacket(new RoomKickPacket(roomId, userId));
+    }
+    
 
     private void CheckDisposed()
     {

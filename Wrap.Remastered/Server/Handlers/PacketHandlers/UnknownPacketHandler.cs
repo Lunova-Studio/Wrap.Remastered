@@ -13,7 +13,7 @@ public class UnknownPacketHandler : BasePacketHandler
     {
     }
 
-    protected override void OnHandle(IChannel channel, UnsolvedPacket packet)
+    public override async Task OnHandleAsync(IChannel channel, UnsolvedPacket packet)
     {
         LogInfo(channel, packet, $"收到未知数据包类型: {packet.PacketType}, 数据长度: {packet.Data.Length} 字节");
 

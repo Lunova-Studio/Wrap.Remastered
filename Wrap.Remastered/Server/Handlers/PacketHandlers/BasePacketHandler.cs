@@ -3,13 +3,20 @@ using DotNetty.Transport.Channels;
 using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol;
 using Wrap.Remastered.Server.Handlers;
+using Wrap.Remastered.Server.Managers;
 using Wrap.Remastered.Server.Services;
+using System.Threading.Tasks;
 
 namespace Wrap.Remastered.Server.Handlers.PacketHandlers;
 
 /// <summary>
 /// 基础数据包处理器
 /// </summary>
+public interface IPacketHandler
+{
+    Task OnHandleAsync(IChannel channel, UnsolvedPacket packet);
+}
+
 public abstract class BasePacketHandler : IPacketHandler
 {
     protected IWrapServer Server { get; private set; }
@@ -20,30 +27,11 @@ public abstract class BasePacketHandler : IPacketHandler
     }
 
     /// <summary>
-    /// 处理数据包
+    /// 数据包处理逻辑
     /// </summary>
     /// <param name="channel">通道</param>
     /// <param name="packet">数据包</param>
-    public virtual void Handle(IChannel channel, UnsolvedPacket packet)
-    {
-        try
-        {
-            OnHandle(channel, packet);
-        }
-        catch (Exception ex)
-        {
-            Server.GetLoggingService().LogError("Packet", "处理数据包时发生错误", ex, "通道: {0}, 数据包类型: {1}", 
-                channel.RemoteAddress, packet.PacketType);
-            OnError(channel, packet, ex);
-        }
-    }
-
-    /// <summary>
-    /// 具体的数据包处理逻辑
-    /// </summary>
-    /// <param name="channel">通道</param>
-    /// <param name="packet">数据包</param>
-    protected abstract void OnHandle(IChannel channel, UnsolvedPacket packet);
+    public abstract Task OnHandleAsync(IChannel channel, UnsolvedPacket packet);
 
     /// <summary>
     /// 错误处理
@@ -67,4 +55,11 @@ public abstract class BasePacketHandler : IPacketHandler
     {
         Server.GetLoggingService().LogPacket("{0} - 通道: {1}", message, channel.RemoteAddress);
     }
+}
+
+// 房间相关业务可继承此基类
+public abstract class RoomPacketHandler : BasePacketHandler
+{
+    protected RoomManager RoomManager => Server.GetRoomManager();
+    protected RoomPacketHandler(IWrapServer server) : base(server) { }
 } 

@@ -89,6 +89,17 @@ public class CommandManager
     /// <returns>补全选项列表</returns>
     public IList<string> Complete(string commandLine)
     {
+        var trimmed = commandLine.TrimStart();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return new List<string>();
+        }
+
+        if (!trimmed.Contains(' '))
+        {
+            // 主命令补全
+            return GetAllCommands().Where(c => c.StartsWith(trimmed, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
         var name = GetCommandName(commandLine);
         var args = GetCommandArgs(commandLine);
         return Complete(name, args);

@@ -6,6 +6,7 @@ using ConsoleInteractive;
 using Wrap.Remastered.Commands;
 using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Server.Managers;
+using System.Linq;
 
 namespace Wrap.Remastered.Server.Services;
 
@@ -68,6 +69,29 @@ public class LoggingService : IDisposable
             ConsoleWriter.Init();
             ConsoleReader.BeginReadThread();
             ConsoleReader.MessageReceived += OnCommandReceived;
+            ConsoleReader.OnInputChange += (sender, e) =>
+            {
+                if (e.Text == string.Empty)
+                {
+                    ConsoleSuggestion.ClearSuggestions();
+                    return;
+                }
+                IList<string>? strings = _server.GetCommandManager().Complete(e.Text.TrimStart());
+                ConsoleSuggestion.ClearSuggestions();
+                List<ConsoleSuggestion.Suggestion> suggestions = new();
+                foreach (string s in strings)
+                {
+                    ConsoleSuggestion.Suggestion suggestion = new(s);
+                    suggestions.Add(suggestion);
+                }
+                int offset = 0;
+                int offset2 = e.Text.Length;
+                if (e.Text.LastIndexOf(" ") != -1)
+                {
+                    offset = e.Text.LastIndexOf(" ") + 1;
+                }
+                ConsoleSuggestion.UpdateSuggestions(suggestions.ToArray(), new(offset, offset2));
+            };
         }
 
         // 启动定时刷新日志的定时器
