@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Wrap.Remastered.Server": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}

@@ -6,4 +6,27 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="Protocol\**" />
+    <EmbeddedResource Remove="Protocol\**" />
+    <None Remove="Protocol\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\refs\NatTypeTester\src\STUN\STUN.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Server\" />
+    <Folder Include="Schemas\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Waher.Networking.UPnP" Version="3.1.0" />
+    <PackageReference Include="DotNetty.Transport" Version="0.7.6" />
+    <PackageReference Include="DotNetty.Codecs" Version="0.7.6" />
+    <PackageReference Include="DotNetty.Handlers" Version="0.7.6" />
+    <PackageReference Include="DotNetty.Buffers" Version="0.7.6" />
+  </ItemGroup>
+
 </Project>
