@@ -78,9 +78,7 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
     /// <param name="channel">通道</param>
     public void OnClientDisconnected(IChannel channel)
     {
-        CheckDisposed();
-
-        if (channel == null)
+        if (_disposed || channel == null)
             return;
 
         if (_connections.TryRemove(channel, out var connection))
@@ -103,9 +101,7 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
     /// <param name="channel">通道</param>
     public void UpdateConnectionActivity(IChannel channel)
     {
-        CheckDisposed();
-
-        if (channel == null)
+        if (_disposed || channel == null)
             return;
 
         if (_connections.TryGetValue(channel, out var connection))
@@ -331,14 +327,20 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
     /// <returns>连接统计信息</returns>
     public ConnectionStatistics GetStatistics()
     {
-        CheckDisposed();
+        if (_disposed)
+            return new ConnectionStatistics();
+
+        var totalConnections = _connections.Count;
+        var userConnections = _userConnections.Count;
+        var activeConnections = _connections.Values.Count(conn => conn.IsActive);
+        var inactiveConnections = totalConnections - activeConnections;
 
         return new ConnectionStatistics
         {
-            TotalConnections = _connections.Count,
-            UserConnections = _userConnections.Count,
-            ActiveConnections = _connections.Values.Count(conn => conn.IsActive),
-            InactiveConnections = _connections.Values.Count(conn => !conn.IsActive)
+            TotalConnections = totalConnections,
+            UserConnections = userConnections,
+            ActiveConnections = activeConnections,
+            InactiveConnections = inactiveConnections
         };
     }
 
@@ -349,6 +351,10 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
     {
         try
         {
+            // 如果已释放，不执行清理
+            if (_disposed)
+                return;
+
             var inactiveConnections = _connections.Values
                 .Where(conn => !conn.IsActive)
                 .ToList();
@@ -385,13 +391,22 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
 
         _disposed = true;
 
+        // 停止定时器
+        _cleanupTimer?.Change(Timeout.Infinite, Timeout.Infinite);
         _cleanupTimer?.Dispose();
 
-        // 关闭所有连接
+        // 关闭所有连接（异步执行，不等待完成）
         var allConnections = _connections.Values.ToArray();
         foreach (var connection in allConnections)
         {
-            connection.Close();
+            try
+            {
+                connection.Close();
+            }
+            catch (Exception)
+            {
+                // 忽略关闭连接时的错误
+            }
         }
 
         _connections.Clear();
@@ -503,9 +518,17 @@ public class ChannelConnection
     /// </summary>
     public void Close()
     {
-        if (IsActive)
+        try
         {
-            Channel.CloseAsync();
+            if (IsActive)
+            {
+                // 异步关闭，不等待完成
+                _ = Channel.CloseAsync();
+            }
+        }
+        catch (Exception)
+        {
+            // 忽略关闭时的错误
         }
     }
 }

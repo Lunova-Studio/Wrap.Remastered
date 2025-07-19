@@ -2,6 +2,7 @@
 using Wrap.Remastered.Schemas;
 using Wrap.Remastered.Network.Protocol.ServerBound;
 using ConsoleInteractive;
+using Wrap.Remastered.Network.Protocol;
 
 namespace Wrap.Remastered.Console;
 
@@ -61,16 +62,13 @@ class Program
         ConsoleWriter.WriteLine("客户端已断开");
     }
 
-    private static void OnDataReceived(object? sender, byte[] data)
+    private static void OnDataReceived(object? sender, UnsolvedPacket unsolvedPacket)
     {
-        ConsoleWriter.WriteLine($"接收到数据: {data.Length} 字节");
+        ConsoleWriter.WriteLine($"接收到数据: {unsolvedPacket.Data.Length} 字节");
         
-        // 这里可以添加数据包解析逻辑
         try
         {
-            // 尝试解析为登录响应数据包
-            // var response = LoginPacket.Serializer.Deserialize(data);
-            // System.Console.WriteLine($"解析为登录响应数据包");
+            
         }
         catch (Exception ex)
         {

@@ -28,8 +28,21 @@ class Program
             System.Console.WriteLine("服务器已启动！按任意键停止服务器...");
             System.Console.ReadKey();
 
-            // 停止服务器
-            await server.StopAsync();
+            System.Console.WriteLine("开始停止服务器...");
+            
+            // 停止服务器（带超时）
+            var stopTask = server.StopAsync();
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(15));
+            
+            var completedTask = await Task.WhenAny(stopTask, timeoutTask);
+            if (completedTask == timeoutTask)
+            {
+                System.Console.WriteLine("停止服务器超时，强制退出...");
+            }
+            else
+            {
+                System.Console.WriteLine("服务器已正常停止");
+            }
         }
         catch (Exception ex)
         {

@@ -44,6 +44,9 @@ public class UnsolvedPacketSerializer : ISerializer<IPacket>
 
         packet.PacketType = stream.ReadInt32();
         int len = stream.ReadVarInt();
+        
+        // 分配内存并读取数据
+        packet.Data = new byte[len];
         stream.Read(packet.Data, 0, len);
 
         return packet;

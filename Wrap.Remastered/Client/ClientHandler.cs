@@ -57,8 +57,15 @@ public class ClientHandler : ChannelHandlerAdapter
         {
             if (message is IByteBuffer buffer)
             {
-                var data = new byte[buffer.ReadableBytes - 1];
+                // 检查缓冲区是否有足够的数据（至少4字节用于数据包类型）
+                if (buffer.ReadableBytes < 4)
+                {
+                    return; // 数据不完整，等待更多数据
+                }
+
                 int packetType = buffer.ReadInt();
+                
+                var data = new byte[buffer.ReadableBytes];
                 buffer.ReadBytes(data);
 
                 _client.OnDataReceived(new UnsolvedPacket(packetType, data));

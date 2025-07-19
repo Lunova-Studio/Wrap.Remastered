@@ -29,6 +29,7 @@ public class WrapServer : IWrapServer, IDisposable
     private IEventLoopGroup? _workerGroup;
     private IChannel? _serverChannel;
     private DotNettyConnectionManager? _connectionManager;
+    private CancellationTokenSource? _statisticsCancellationTokenSource;
     
     private volatile bool _disposed = false;
     private volatile bool _isRunning = false;
@@ -118,7 +119,8 @@ public class WrapServer : IWrapServer, IDisposable
             ServerStarted?.Invoke(this, EventArgs.Empty);
 
             // 启动统计信息输出任务
-            _ = Task.Run(OutputStatisticsAsync);
+            _statisticsCancellationTokenSource = new CancellationTokenSource();
+            _ = Task.Run(OutputStatisticsAsync, _statisticsCancellationTokenSource.Token);
         }
         catch (Exception ex)
         {
@@ -146,6 +148,20 @@ public class WrapServer : IWrapServer, IDisposable
 
             _isRunning = false;
 
+            // 取消统计任务
+            _statisticsCancellationTokenSource?.Cancel();
+            
+            // 等待一小段时间让统计任务正常退出
+            await Task.Delay(100);
+
+            // 释放连接管理器
+            _connectionManager?.Dispose();
+            _connectionManager = null;
+
+            // 释放统计任务的取消令牌
+            _statisticsCancellationTokenSource?.Dispose();
+            _statisticsCancellationTokenSource = null;
+
             // 关闭服务器通道
             if (_serverChannel != null)
             {
@@ -153,22 +169,38 @@ public class WrapServer : IWrapServer, IDisposable
                 _serverChannel = null;
             }
 
-            // 关闭事件循环组
+            // 关闭事件循环组（带超时）
             if (_bossGroup != null)
             {
-                await _bossGroup.ShutdownGracefullyAsync();
-                _bossGroup = null;
+                try
+                {
+                    await _bossGroup.ShutdownGracefullyAsync(TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10));
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"关闭Boss事件循环组时发生错误: {ex.Message}");
+                }
+                finally
+                {
+                    _bossGroup = null;
+                }
             }
 
             if (_workerGroup != null)
             {
-                await _workerGroup.ShutdownGracefullyAsync();
-                _workerGroup = null;
+                try
+                {
+                    await _workerGroup.ShutdownGracefullyAsync(TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10));
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"关闭Worker事件循环组时发生错误: {ex.Message}");
+                }
+                finally
+                {
+                    _workerGroup = null;
+                }
             }
-
-            // 释放连接管理器
-            _connectionManager?.Dispose();
-            _connectionManager = null;
 
             Console.WriteLine("服务器已停止");
             ServerStopped?.Invoke(this, EventArgs.Empty);
@@ -328,17 +360,27 @@ public class WrapServer : IWrapServer, IDisposable
     /// </summary>
     private async Task OutputStatisticsAsync()
     {
-        while (_isRunning)
+        while (!_statisticsCancellationTokenSource?.IsCancellationRequested ?? false)
         {
             try
             {
-                await Task.Delay(30000); // 每30秒输出一次统计信息
+                await Task.Delay(30000, _statisticsCancellationTokenSource.Token); // 每30秒输出一次统计信息
 
                 if (_isRunning && _connectionManager != null)
                 {
                     var stats = _connectionManager.GetStatistics();
                     Console.WriteLine($"服务器统计: 总连接 {stats.TotalConnections}, 用户连接 {stats.UserConnections}, 活跃连接 {stats.ActiveConnections}");
                 }
+            }
+            catch (OperationCanceledException) when (_statisticsCancellationTokenSource?.IsCancellationRequested ?? false)
+            {
+                // 统计任务已取消，正常退出
+                break;
+            }
+            catch (ObjectDisposedException)
+            {
+                // 连接管理器已被释放，正常退出
+                break;
             }
             catch (Exception ex)
             {
@@ -359,11 +401,26 @@ public class WrapServer : IWrapServer, IDisposable
 
         _disposed = true;
 
-        // 停止服务器
+        // 停止服务器（异步执行，不等待完成）
         if (_isRunning)
         {
-            StopAsync().GetAwaiter().GetResult();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await StopAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Dispose时停止服务器发生错误: {ex.Message}");
+                }
+            });
         }
+
+        // 确保取消令牌被释放
+        _statisticsCancellationTokenSource?.Cancel();
+        _statisticsCancellationTokenSource?.Dispose();
+        _statisticsCancellationTokenSource = null;
 
         GC.SuppressFinalize(this);
     }

@@ -56,8 +56,6 @@ public class WrapClient : IWrapClient, IDisposable
 
         try
         {
-            Console.WriteLine($"正在连接到服务器: {serverAddress}:{port}");
-
             // 解析服务器地址，确保使用IPv4
             IPAddress? ipAddress = null;
             if (serverAddress.ToLower() == "localhost")
@@ -80,8 +78,6 @@ public class WrapClient : IWrapClient, IDisposable
             {
                 throw new ArgumentException($"服务器地址必须是IPv4地址: {serverAddress}");
             }
-
-            Console.WriteLine($"解析的IP地址: {ipAddress}");
 
             _eventLoopGroup = new MultithreadEventLoopGroup(1);
 
@@ -177,12 +173,16 @@ public class WrapClient : IWrapClient, IDisposable
             
             if (_clientChannel != null)
             {
-                var buffer = Unpooled.WrappedBuffer(data);
-                await _clientChannel.WriteAsync(Unpooled.CopyInt((int)packet.GetPacketType()));
+                // 创建包含数据包类型和数据的完整数据包
+                var packetData = new byte[4 + data.Length];
+                BitConverter.GetBytes((int)packet.GetPacketType()).CopyTo(packetData, 0);
+                data.CopyTo(packetData, 4);
+                
+                var buffer = Unpooled.WrappedBuffer(packetData);
                 await _clientChannel.WriteAndFlushAsync(buffer);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             throw;
         }
@@ -212,12 +212,18 @@ public class WrapClient : IWrapClient, IDisposable
         {
             DataReceived?.Invoke(this, unsolved);
 
-            ISerializer<IPacket> serializer = IClientBoundPacket.Serializers[(ClientBoundPacketType)unsolved.PacketType];
-            IClientBoundPacket packet = (IClientBoundPacket)serializer.Deserialize(unsolved.Data);
-            
-            PacketReceived?.Invoke(this, packet);
+            // 检查是否有对应的序列化器
+            if (IClientBoundPacket.Serializers.TryGetValue((ClientBoundPacketType)unsolved.PacketType, out var serializer))
+            {
+                IClientBoundPacket packet = (IClientBoundPacket)serializer.Deserialize(unsolved.Data);
+                
+                PacketReceived?.Invoke(this, packet);
+            }
         }
-        catch (Exception) { }
+        catch (Exception ex)
+        {
+            // 静默处理异常
+        }
     }
 
     private void CheckDisposed()
