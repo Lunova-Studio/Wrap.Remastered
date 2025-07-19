@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113 d17.12
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wrap.Remastered", "Wrap.Remastered\Wrap.Remastered.csproj", "{05989CB0-A2D1-4C51-A23D-4E44E0AC9C84}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wrap.Remastered.Console", "Wrap.Remastered.Console\Wrap.Remastered.Console.csproj", "{756CCF27-DE9D-4424-B19C-E5BFDF9764B4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{05989CB0-A2D1-4C51-A23D-4E44E0AC9C84}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05989CB0-A2D1-4C51-A23D-4E44E0AC9C84}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05989CB0-A2D1-4C51-A23D-4E44E0AC9C84}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05989CB0-A2D1-4C51-A23D-4E44E0AC9C84}.Release|Any CPU.Build.0 = Release|Any CPU
+		{756CCF27-DE9D-4424-B19C-E5BFDF9764B4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{756CCF27-DE9D-4424-B19C-E5BFDF9764B4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{756CCF27-DE9D-4424-B19C-E5BFDF9764B4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{756CCF27-DE9D-4424-B19C-E5BFDF9764B4}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
