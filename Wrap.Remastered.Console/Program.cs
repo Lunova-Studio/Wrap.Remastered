@@ -1,6 +1,5 @@
 ﻿using ConsoleInteractive;
 using Wrap.Remastered.Client;
-using Wrap.Remastered.Server.Services;
 using Wrap.Remastered.Schemas;
 
 namespace Wrap.Remastered.Console;
@@ -14,7 +13,7 @@ class Program
             // 初始化控制台交互
             ConsoleWriter.Init();
             ConsoleReader.BeginReadThread();
-            
+
             ConsoleWriter.WriteLineFormatted("§a=== Wrap.Remastered 客户端 ===");
             ConsoleWriter.WriteLineFormatted("§f输入 'help' 查看可用命令");
             ConsoleWriter.WriteLineFormatted("§f输入 'connect' 连接到服务器");

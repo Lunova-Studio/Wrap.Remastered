@@ -107,7 +107,7 @@ public class ServerHandler : ChannelHandlerAdapter
                 var unsolvedPacket = new UnsolvedPacket(packetType, data);
 
                 // 处理接收到的数据包
-                _ = ProcessReceivedPacket(context.Channel, unsolvedPacket);
+                _ = ProcessReceivedPacketAsync(context.Channel, unsolvedPacket);
             }
         }
         catch (ObjectDisposedException)
@@ -146,7 +146,7 @@ public class ServerHandler : ChannelHandlerAdapter
     /// </summary>
     /// <param name="channel">通道</param>
     /// <param name="packet">数据包</param>
-    private async Task ProcessReceivedPacket(IChannel channel, UnsolvedPacket packet)
+    private async Task ProcessReceivedPacketAsync(IChannel channel, UnsolvedPacket packet)
     {
         try
         {

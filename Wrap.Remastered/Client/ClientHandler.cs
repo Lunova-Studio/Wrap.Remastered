@@ -1,12 +1,6 @@
 ﻿using DotNetty.Buffers;
 using DotNetty.Transport.Channels;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Wrap.Remastered.Network.Protocol;
-using Wrap.Remastered.Network.Protocol.ServerBound;
 using Wrap.Remastered.Network.Protocol.ClientBound;
 using Wrap.Remastered.Schemas;
 
@@ -66,7 +60,7 @@ public class ClientHandler : ChannelHandlerAdapter
                 }
 
                 int packetType = buffer.ReadIntLE();
-                
+
                 var data = new byte[buffer.ReadableBytes];
                 buffer.ReadBytes(data);
 

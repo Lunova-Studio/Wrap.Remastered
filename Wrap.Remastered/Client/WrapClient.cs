@@ -1,24 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Wrap.Remastered.Interfaces;
-using Wrap.Remastered.Network.Protocol;
-using Wrap.Remastered.Schemas;
-using Wrap.Remastered.Server;
+﻿using ConsoleInteractive;
 using DotNetty.Buffers;
+using DotNetty.Codecs;
+using DotNetty.Handlers.Logging;
+using DotNetty.Transport.Bootstrapping;
 using DotNetty.Transport.Channels;
 using DotNetty.Transport.Channels.Sockets;
-using DotNetty.Transport.Bootstrapping;
-using DotNetty.Handlers.Logging;
-using DotNetty.Codecs;
 using System.Net;
-using Wrap.Remastered.Network.Protocol.ServerBound;
 using System.Net.Sockets;
+using Wrap.Remastered.Interfaces;
+using Wrap.Remastered.Network.Protocol;
 using Wrap.Remastered.Network.Protocol.ClientBound;
-using Wrap.Remastered.Client;
-using ConsoleInteractive;
+using Wrap.Remastered.Network.Protocol.ServerBound;
+using Wrap.Remastered.Schemas;
 
 namespace Wrap.Remastered.Client;
 
@@ -118,7 +111,7 @@ public class WrapClient : IWrapClient, IDisposable
             {
                 var hostEntry = await Dns.GetHostEntryAsync(serverAddress);
                 ipAddress = hostEntry.AddressList.FirstOrDefault(addr => addr.AddressFamily == AddressFamily.InterNetwork);
-                
+
                 if (ipAddress == null)
                 {
                     throw new ArgumentException($"无法解析服务器地址: {serverAddress}");
@@ -142,7 +135,7 @@ public class WrapClient : IWrapClient, IDisposable
                    .Handler(new ActionChannelInitializer<ISocketChannel>(channel =>
                    {
                        var pipeline = channel.Pipeline;
-                       
+
                        pipeline.AddLast(new LoggingHandler("Client"));
                        pipeline.AddLast(new LengthFieldBasedFrameDecoder(65536, 0, 4, 0, 4));
                        pipeline.AddLast(new LengthFieldPrepender(4));
@@ -221,14 +214,14 @@ public class WrapClient : IWrapClient, IDisposable
             var serializer = packet.GetSerializer();
             var data = serializer.Serialize(packet);
             packet.OnSerialize(ref data);
-            
+
             if (_clientChannel != null)
             {
                 // 创建包含数据包类型和数据的完整数据包
                 var packetData = new byte[4 + data.Length];
                 BitConverter.GetBytes((int)packet.GetPacketType()).CopyTo(packetData, 0);
                 data.CopyTo(packetData, 4);
-                
+
                 var buffer = Unpooled.WrappedBuffer(packetData);
                 await _clientChannel.WriteAndFlushAsync(buffer);
             }
@@ -394,7 +387,7 @@ public class WrapClient : IWrapClient, IDisposable
     {
         SendPacket(new RoomKickPacket(roomId, userId));
     }
-    
+
 
     private void CheckDisposed()
     {
