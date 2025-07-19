@@ -41,7 +41,7 @@ public class WrapClient : IWrapClient, IDisposable
     public UserProfile Profile => _profile;
 
     public event EventHandler? Connected;
-    public event EventHandler? Disconnected;
+    public event EventHandler<string>? Disconnected;
     public event EventHandler<UnsolvedPacket>? DataReceived;
     public event EventHandler<IClientBoundPacket>? PacketReceived;
     public event EventHandler<UserInfo>? LoggedIn;
@@ -175,7 +175,7 @@ public class WrapClient : IWrapClient, IDisposable
                 _eventLoopGroup = null;
             }
 
-            Disconnected?.Invoke(this, EventArgs.Empty);
+            Disconnected?.Invoke(this, "");
         }
         catch (Exception) { }
     }
@@ -273,6 +273,16 @@ public class WrapClient : IWrapClient, IDisposable
     internal void OnPacketReceived(IClientBoundPacket packet)
     {
         PacketReceived?.Invoke(this, packet);
+    }
+
+    internal void OnDisconnectPacketReceived(DisconnectPacket packet)
+    {
+        _isConnected = false;
+        _isLoggedIn = false;
+        // 触发断开连接事件
+        Disconnected?.Invoke(this, packet.Reason);
+
+        _ = DisconnectAsync();
     }
 
     private void CheckDisposed()

@@ -9,5 +9,6 @@ namespace Wrap.Remastered.Network.Protocol.ClientBound;
 public enum ClientBoundPacketType
 {
     LoginSucceedPacket,
-    LoginFailedPacket
+    LoginFailedPacket,
+    DisconnectPacket
 }

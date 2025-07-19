@@ -106,25 +106,29 @@ public class LoginPacketHandler : BasePacketHandler
         }
     }
 
-    private async Task SendPacketAsync(IChannel channel, IClientBoundPacket packet)
+    /// <summary>
+    /// 发送断开连接包（踢出/服务器关闭等）
+    /// </summary>
+    public void SendDisconnectPacket(IChannel channel, string reason)
     {
         try
         {
-            var serializer = packet.GetSerializer();
-            var data = serializer.Serialize(packet);
-            packet.OnSerialize(ref data);
-
-            // 创建包含数据包类型和数据的完整数据包
-            var packetData = new byte[4 + data.Length];
-            BitConverter.GetBytes((int)packet.GetPacketType()).CopyTo(packetData, 0);
-            data.CopyTo(packetData, 4);
-
-            var buffer = DotNetty.Buffers.Unpooled.WrappedBuffer(packetData);
-            await channel.WriteAndFlushAsync(buffer);
+            var disconnectPacket = new DisconnectPacket
+            {
+                Reason = reason,
+                DisconnectTime = DateTime.UtcNow
+            };
+            SendPacketAsync(channel, disconnectPacket).Wait();
+            Server.GetLoggingService().LogUser("已发送断开连接包: {0}", reason);
         }
         catch (Exception ex)
         {
-            Server.GetLoggingService().LogError("User", "发送数据包时发生错误", ex);
+            Server.GetLoggingService().LogError("User", "发送断开连接包时发生错误", ex);
         }
+    }
+
+    private async Task SendPacketAsync(IChannel channel, IClientBoundPacket packet)
+    {
+        
     }
 }

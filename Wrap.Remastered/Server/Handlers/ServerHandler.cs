@@ -61,7 +61,7 @@ public class ServerHandler : ChannelHandlerAdapter
             _server.GetLoggingService().LogConnection("客户端断开: {0}", remoteAddress);
 
             // 通知连接管理器连接断开
-            _server.GetConnectionManager().OnClientDisconnected(channel);
+            _server.GetConnectionManager()?.OnClientDisconnected(channel);
         }
         catch (ObjectDisposedException)
         {
@@ -287,7 +287,7 @@ public interface IConnectionManager
 
     IEnumerable<ChannelConnection> GetAllConnections();
 
-    bool DisconnectUser(string userId);
+    bool DisconnectUser(string userId, string? reason = null);
 
     ConnectionStatistics GetStatistics();
 

@@ -87,7 +87,7 @@ public interface IWrapServer : IDisposable
     /// </summary>
     /// <param name="clientId">客户端ID</param>
     /// <returns>是否断开成功</returns>
-    Task<bool> DisconnectClientAsync(string clientId);
+    Task<bool> DisconnectClientAsync(string clientId, string? reason = null);
 
     CommandManager GetCommandManager();
 

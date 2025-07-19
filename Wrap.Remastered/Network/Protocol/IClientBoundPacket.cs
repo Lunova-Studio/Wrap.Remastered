@@ -14,7 +14,8 @@ public interface IClientBoundPacket : IPacket
     public static Dictionary<ClientBoundPacketType, ISerializer<IPacket>> Serializers = new()
     {
         { ClientBoundPacketType.LoginSucceedPacket, new LoginSucceedPacketSerializer() },
-        { ClientBoundPacketType.LoginFailedPacket, new LoginFailedPacketSerializer() }
+        { ClientBoundPacketType.LoginFailedPacket, new LoginFailedPacketSerializer() },
+        { ClientBoundPacketType.DisconnectPacket, new DisconnectPacketSerializer() }
     };
 
     ClientBoundPacketType GetPacketType();

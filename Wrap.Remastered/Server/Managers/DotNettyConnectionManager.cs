@@ -4,13 +4,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using DotNetty.Buffers;
 using DotNetty.Transport.Channels;
+using Wrap.Remastered.Extensions;
 using Wrap.Remastered.Interfaces;
+using Wrap.Remastered.Network.Protocol;
+using Wrap.Remastered.Network.Protocol.ClientBound;
 using Wrap.Remastered.Schemas;
 using Wrap.Remastered.Server.Handlers;
 using Wrap.Remastered.Server.Services;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Wrap.Remastered.Server.Managers;
 
@@ -282,13 +287,60 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
         var results = await Task.WhenAll(tasks);
         return results.Count(x => x);
     }
+    public async Task<int> BroadcastToAllAsync(IClientBoundPacket packet, string? excludeUserId = null)
+    {
+        CheckDisposed();
+
+        var connections = _connections.Values
+            .Where(conn => conn.IsActive)
+            .ToList();
+
+        var tasks = connections.Select(async connection =>
+        {
+            try
+            {
+                return await connection.SendPacketAsync(packet);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        });
+
+        var results = await Task.WhenAll(tasks);
+        return results.Count(x => x);
+    }
+
+    public async Task<int> BroadcastToUsersAsync(IClientBoundPacket packet, string? excludeUserId = null)
+    {
+        CheckDisposed();
+
+        var connections = _userConnections.Values
+            .Where(conn => conn.IsActive && (excludeUserId == null || conn.UserId != excludeUserId))
+            .ToList();
+
+        var tasks = connections.Select(async connection =>
+        {
+            try
+            {
+                return await connection.SendPacketAsync(packet);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        });
+
+        var results = await Task.WhenAll(tasks);
+        return results.Count(x => x);
+    }
 
     /// <summary>
     /// 断开用户连接
     /// </summary>
     /// <param name="userId">用户ID</param>
     /// <returns>是否成功断开</returns>
-    public bool DisconnectUser(string userId)
+    public bool DisconnectUser(string userId, string? reason = null)
     {
         CheckDisposed();
 
@@ -297,6 +349,7 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
 
         if (_userConnections.TryRemove(userId, out var connection))
         {
+            connection.SendPacketAsync(new DisconnectPacket(reason)).Wait();
             connection.Close();
             return true;
         }
@@ -346,6 +399,18 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
             ActiveConnections = activeConnections,
             InactiveConnections = inactiveConnections
         };
+    }
+
+    /// <summary>
+    /// 发送IClientBoundPacket给指定用户
+    /// </summary>
+    public async Task<bool> SendPacketToUserAsync(string userId, IClientBoundPacket packet)
+    {
+        CheckDisposed();
+        var connection = GetUserConnection(userId);
+        if (connection == null || !connection.IsActive)
+            return false;
+        return await connection.SendPacketAsync(packet);
     }
 
     /// <summary>
@@ -512,6 +577,29 @@ public class ChannelConnection
             return true;
         }
         catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> SendPacketAsync(IClientBoundPacket packet)
+    {
+        try
+        {
+            var serializer = packet.GetSerializer();
+            var packetData = serializer.Serialize(packet);
+            packet.OnSerialize(ref packetData);
+
+            using MemoryStream stream = new MemoryStream(4 + packetData.Length);
+            stream.WriteInt32((int)packet.GetPacketType());
+            await stream.WriteAsync(packetData, 0, packetData.Length);
+
+            var buffer = DotNetty.Buffers.Unpooled.WrappedBuffer(stream.GetBuffer());
+            await Channel.WriteAndFlushAsync(buffer);
+
+            return true;
+        }
+        catch (Exception ex)
         {
             return false;
         }

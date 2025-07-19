@@ -7,20 +7,20 @@ namespace Wrap.Remastered.Commands.Server;
 /// <summary>
 /// 退出命令
 /// </summary>
-public class QuitCommand : CommandBase
+public class StopCommand : CommandBase
 {
     private readonly IWrapServer _server;
 
-    public QuitCommand(IWrapServer server)
+    public StopCommand(IWrapServer server)
     {
         _server = server ?? throw new ArgumentNullException(nameof(server));
     }
 
-    public override string GetName() => "quit";
+    public override string GetName() => "stop";
 
     public override string GetDescription() => "优雅地关闭服务器";
 
-    public override string GetUsage() => "quit";
+    public override string GetUsage() => "stop";
 
     public override void OnExecute(string[] args)
     {

@@ -57,9 +57,11 @@ class Program
     /// <summary>
     /// 客户端断开事件处理
     /// </summary>
-    private static void OnClientDisconnected(object? sender, EventArgs e)
+    private static void OnClientDisconnected(object? sender, string reason)
     {
-        ConsoleWriter.WriteLineFormatted("§c客户端已断开连接");
+        ConsoleWriter.WriteLineFormatted($"§c客户端已断开连接 原因 {reason}");
+
+        Environment.Exit(0);
     }
 
     /// <summary>

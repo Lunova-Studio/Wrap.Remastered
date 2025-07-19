@@ -65,7 +65,7 @@ public class ClientHandler : ChannelHandlerAdapter
                     return; // 数据不完整，等待更多数据
                 }
 
-                int packetType = buffer.ReadInt();
+                int packetType = buffer.ReadIntLE();
                 
                 var data = new byte[buffer.ReadableBytes];
                 buffer.ReadBytes(data);
@@ -113,6 +113,11 @@ public class ClientHandler : ChannelHandlerAdapter
                             DisplayName = loginSucceed.DisplayName
                         };
                         _client.OnLoginSuccess(userInfo);
+                    }
+                    // 处理断开连接包
+                    else if (packet is DisconnectPacket disconnectPacket)
+                    {
+                        _client.OnDisconnectPacketReceived(disconnectPacket);
                     }
                 }
             }

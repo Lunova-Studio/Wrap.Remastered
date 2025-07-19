@@ -87,7 +87,7 @@ public class LoggingService : IDisposable
         commandManager.RegisterCommandExecuter(new Commands.Server.UsersCommand(_server));
         commandManager.RegisterCommandExecuter(new Commands.Server.KickCommand(_server));
         commandManager.RegisterCommandExecuter(new Commands.Server.BroadcastCommand(_server));
-        commandManager.RegisterCommandExecuter(new Commands.Server.QuitCommand(_server));
+        commandManager.RegisterCommandExecuter(new Commands.Server.StopCommand(_server));
 
         // 注册标签页补全器
         commandManager.RegisterCommandTabCompleter(new Commands.Server.HelpCommand(_server));

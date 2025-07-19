@@ -7,6 +7,7 @@ using DotNetty.Transport.Channels.Sockets;
 using System.Net;
 using Wrap.Remastered.Commands;
 using Wrap.Remastered.Interfaces;
+using Wrap.Remastered.Network.Protocol.ClientBound;
 using Wrap.Remastered.Server.Events;
 using Wrap.Remastered.Server.Handlers;
 using Wrap.Remastered.Server.Managers;
@@ -141,6 +142,7 @@ public class WrapServer : IWrapServer, IDisposable
     /// </summary>
     public async Task StopAsync()
     {
+        await BroadcastServerShutdownAsync();
         CheckDisposed();
 
         if (!_isRunning)
@@ -255,14 +257,13 @@ public class WrapServer : IWrapServer, IDisposable
     /// </summary>
     /// <param name="clientId">客户端ID</param>
     /// <returns>是否断开成功</returns>
-    public async Task<bool> DisconnectClientAsync(string clientId)
+    public async Task<bool> DisconnectClientAsync(string clientId, string? reason = null)
     {
         CheckDisposed();
-
         if (_connectionManager == null)
             return false;
 
-        var success = _connectionManager.DisconnectUser(clientId);
+        var success = _connectionManager.DisconnectUser(clientId, reason);
         return await Task.FromResult(success);
     }
 
@@ -310,6 +311,21 @@ public class WrapServer : IWrapServer, IDisposable
                 ConsoleWriter.WriteLine($"输出统计信息时发生错误: {ex.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// 关闭服务器时，广播断开包
+    /// </summary>
+    private async Task BroadcastServerShutdownAsync()
+    {
+        var disconnectPacket = new Wrap.Remastered.Network.Protocol.ClientBound.DisconnectPacket
+        {
+            Reason = "服务器关闭",
+            DisconnectTime = DateTime.UtcNow
+        };
+
+        if (_connectionManager != null)
+            await _connectionManager.BroadcastToAllAsync(disconnectPacket);
     }
 
     /// <summary>
