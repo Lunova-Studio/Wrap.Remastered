@@ -1,20 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using DotNetty.Buffers;
+﻿using ConsoleInteractive;
 using DotNetty.Codecs;
 using DotNetty.Handlers.Logging;
 using DotNetty.Transport.Bootstrapping;
 using DotNetty.Transport.Channels;
 using DotNetty.Transport.Channels.Sockets;
+using System.Net;
+using Wrap.Remastered.Commands;
 using Wrap.Remastered.Interfaces;
-using Wrap.Remastered.Schemas;
+using Wrap.Remastered.Server.Events;
 using Wrap.Remastered.Server.Handlers;
 using Wrap.Remastered.Server.Managers;
+using Wrap.Remastered.Server.Services;
 
 namespace Wrap.Remastered.Server;
 
@@ -24,13 +20,18 @@ public class WrapServer : IWrapServer, IDisposable
     private readonly int _bossThreads;
     private readonly int _workerThreads;
     private readonly int _maxConnections;
-    
+
     private IEventLoopGroup? _bossGroup;
     private IEventLoopGroup? _workerGroup;
     private IChannel? _serverChannel;
+
     private DotNettyConnectionManager? _connectionManager;
+    private CommandManager _commandManager;
+    private LoggingService _loggingService;
+
+
     private CancellationTokenSource? _statisticsCancellationTokenSource;
-    
+
     private volatile bool _disposed = false;
     private volatile bool _isRunning = false;
 
@@ -41,10 +42,11 @@ public class WrapServer : IWrapServer, IDisposable
     public int CurrentConnections => _connectionManager?.CurrentConnections ?? 0;
     public int CurrentUserConnections => _connectionManager?.CurrentUserConnections ?? 0;
 
-    public event EventHandler? ServerStarted;
-    public event EventHandler? ServerStopped;
-    public event EventHandler<ChannelConnectionEventArgs>? ClientConnected;
-    public event EventHandler<ChannelConnectionEventArgs>? ClientDisconnected;
+    public event EventHandler<ServerStartedEventArgs>? ServerStarted;
+    public event EventHandler<ServerStoppedEventArgs>? ServerStopped;
+    public event EventHandler<ClientConnectedEventArgs>? ClientConnected;
+    public event EventHandler<ClientDisconnectedEventArgs>? ClientDisconnected;
+    public event EventHandler<DataReceivedEventArgs>? DataReceived;
 
     public WrapServer(int port = 10270, int bossThreads = 1, int workerThreads = 4, int maxConnections = 1000)
     {
@@ -61,6 +63,11 @@ public class WrapServer : IWrapServer, IDisposable
         _bossThreads = bossThreads;
         _workerThreads = workerThreads;
         _maxConnections = maxConnections;
+
+        _commandManager = new CommandManager();
+        _loggingService = new LoggingService(this);
+
+        _loggingService.InitializeServerCommands();
     }
 
     public async Task StartAsync()
@@ -81,8 +88,8 @@ public class WrapServer : IWrapServer, IDisposable
             _workerGroup = new MultithreadEventLoopGroup(_workerThreads);
 
             // 创建连接管理器
-            _connectionManager = new DotNettyConnectionManager();
-            
+            _connectionManager = new DotNettyConnectionManager(this);
+
             // 注册事件处理器
             _connectionManager.ClientConnected += OnClientConnected;
             _connectionManager.ClientDisconnected += OnClientDisconnected;
@@ -99,14 +106,13 @@ public class WrapServer : IWrapServer, IDisposable
                    .ChildHandler(new ActionChannelInitializer<ISocketChannel>(channel =>
                    {
                        var pipeline = channel.Pipeline;
-                       
+
                        pipeline.AddLast(new LoggingHandler("Worker"));
                        pipeline.AddLast(new LengthFieldBasedFrameDecoder(65536, 0, 4, 0, 4));
                        pipeline.AddLast(new LengthFieldPrepender(4));
-                       pipeline.AddLast(new ServerHandler(_connectionManager, _workerGroup));
+                       pipeline.AddLast(new ServerHandler(this, _workerGroup));
                    }));
 
-            // 绑定端口并启动服务器
             var endpoint = new IPEndPoint(IPAddress.Any, _port);
             _serverChannel = await bootstrap.BindAsync(endpoint);
             _isRunning = true;
@@ -116,7 +122,7 @@ public class WrapServer : IWrapServer, IDisposable
             Console.WriteLine($"Boss线程数: {_bossThreads}");
             Console.WriteLine($"Worker线程数: {_workerThreads}");
 
-            ServerStarted?.Invoke(this, EventArgs.Empty);
+            ServerStarted?.Invoke(this, new ServerStartedEventArgs(_port));
 
             // 启动统计信息输出任务
             _statisticsCancellationTokenSource = new CancellationTokenSource();
@@ -149,8 +155,8 @@ public class WrapServer : IWrapServer, IDisposable
             _isRunning = false;
 
             // 取消统计任务
-            _statisticsCancellationTokenSource?.Cancel();
-            
+            await _statisticsCancellationTokenSource?.CancelAsync();
+
             // 等待一小段时间让统计任务正常退出
             await Task.Delay(100);
 
@@ -203,156 +209,79 @@ public class WrapServer : IWrapServer, IDisposable
             }
 
             Console.WriteLine("服务器已停止");
-            ServerStopped?.Invoke(this, EventArgs.Empty);
+            ServerStopped?.Invoke(this, new ServerStoppedEventArgs());
         }
         catch (Exception ex)
         {
             Console.WriteLine($"停止服务器时发生错误: {ex.Message}");
+            ServerStopped?.Invoke(this, new ServerStoppedEventArgs(ex.Message));
             throw;
         }
     }
 
     /// <summary>
-    /// 启动服务器（同步版本）
+    /// 广播数据给所有客户端
     /// </summary>
-    public void Start()
-    {
-        StartAsync().GetAwaiter().GetResult();
-    }
-
-    /// <summary>
-    /// 关闭服务器（同步版本）
-    /// </summary>
-    public void Shutdown()
-    {
-        StopAsync().GetAwaiter().GetResult();
-    }
-
-    /// <summary>
-    /// 发送数据给用户
-    /// </summary>
-    /// <param name="userId">用户ID</param>
     /// <param name="data">数据</param>
-    /// <returns>是否成功发送</returns>
-    public async Task<bool> SendDataToUserAsync(string userId, byte[] data)
+    /// <returns>发送成功的客户端数量</returns>
+    public async Task<int> BroadcastAsync(byte[] data)
     {
         CheckDisposed();
 
-        if (!_isRunning || _connectionManager == null)
+        if (_connectionManager == null)
+            return 0;
+
+        return await _connectionManager.BroadcastToAllAsync(data);
+    }
+
+    /// <summary>
+    /// 发送数据给指定客户端
+    /// </summary>
+    /// <param name="clientId">客户端ID</param>
+    /// <param name="data">数据</param>
+    /// <returns>是否发送成功</returns>
+    public async Task<bool> SendToClientAsync(string clientId, byte[] data)
+    {
+        CheckDisposed();
+
+        if (_connectionManager == null)
             return false;
 
-        return await _connectionManager.SendDataToUserAsync(userId, data);
+        return await _connectionManager.SendDataToUserAsync(clientId, data);
     }
 
     /// <summary>
-    /// 广播数据给所有用户
+    /// 断开指定客户端连接
     /// </summary>
-    /// <param name="data">数据</param>
-    /// <param name="excludeUserId">排除的用户ID</param>
-    /// <returns>成功发送的连接数</returns>
-    public async Task BroadcastToUsersAsync(byte[] data, string? excludeUserId = null)
+    /// <param name="clientId">客户端ID</param>
+    /// <returns>是否断开成功</returns>
+    public async Task<bool> DisconnectClientAsync(string clientId)
     {
         CheckDisposed();
 
-        if (!_isRunning || _connectionManager == null)
-            return;
-
-        await _connectionManager.BroadcastToUsersAsync(data, excludeUserId);
-    }
-
-    /// <summary>
-    /// 广播数据给所有连接
-    /// </summary>
-    /// <param name="data">数据</param>
-    public async Task BroadcastToAllAsync(byte[] data)
-    {
-        CheckDisposed();
-
-        if (!_isRunning || _connectionManager == null)
-            return;
-
-        await _connectionManager.BroadcastToAllAsync(data);
-    }
-
-    /// <summary>
-    /// 设置用户信息
-    /// </summary>
-    /// <param name="channel">通道</param>
-    /// <param name="userInfo">用户信息</param>
-    public void SetUserInfo(IChannel channel, UserInfo userInfo)
-    {
-        CheckDisposed();
-
-        if (!_isRunning || _connectionManager == null)
-            return;
-
-        _connectionManager.SetUserInfo(channel, userInfo);
-    }
-
-    /// <summary>
-    /// 获取用户连接
-    /// </summary>
-    /// <param name="userId">用户ID</param>
-    /// <returns>通道连接</returns>
-    public ChannelConnection? GetUserConnection(string userId)
-    {
-        CheckDisposed();
-
-        if (!_isRunning || _connectionManager == null)
-            return null;
-
-        return _connectionManager.GetUserConnection(userId);
-    }
-
-    /// <summary>
-    /// 检查用户是否已连接
-    /// </summary>
-    /// <param name="userId">用户ID</param>
-    /// <returns>是否已连接</returns>
-    public bool IsUserConnected(string userId)
-    {
-        CheckDisposed();
-
-        if (!_isRunning || _connectionManager == null)
+        if (_connectionManager == null)
             return false;
 
-        return _connectionManager.IsUserConnected(userId);
-    }
-
-    /// <summary>
-    /// 获取连接统计信息
-    /// </summary>
-    /// <returns>连接统计信息</returns>
-    public ConnectionStatistics? GetStatistics()
-    {
-        CheckDisposed();
-
-        if (!_isRunning || _connectionManager == null)
-            return null;
-
-        return _connectionManager.GetStatistics();
+        var success = _connectionManager.DisconnectUser(clientId);
+        return await Task.FromResult(success);
     }
 
     /// <summary>
     /// 客户端连接事件处理
     /// </summary>
-    /// <param name="sender">发送者</param>
-    /// <param name="e">事件参数</param>
     private void OnClientConnected(object? sender, ChannelConnectionEventArgs e)
     {
-        Console.WriteLine($"客户端连接: {e.Connection.RemoteAddress}");
-        ClientConnected?.Invoke(this, e);
+        var clientId = e.Connection.UserId ?? e.Connection.RemoteAddress;
+        ClientConnected?.Invoke(this, new ClientConnectedEventArgs(clientId, e.Connection.RemoteAddress));
     }
 
     /// <summary>
     /// 客户端断开事件处理
     /// </summary>
-    /// <param name="sender">发送者</param>
-    /// <param name="e">事件参数</param>
     private void OnClientDisconnected(object? sender, ChannelConnectionEventArgs e)
     {
-        Console.WriteLine($"客户端断开: {e.Connection.RemoteAddress}");
-        ClientDisconnected?.Invoke(this, e);
+        var clientId = e.Connection.UserId ?? e.Connection.RemoteAddress;
+        ClientDisconnected?.Invoke(this, new ClientDisconnectedEventArgs(clientId));
     }
 
     /// <summary>
@@ -360,68 +289,71 @@ public class WrapServer : IWrapServer, IDisposable
     /// </summary>
     private async Task OutputStatisticsAsync()
     {
-        while (!_statisticsCancellationTokenSource?.IsCancellationRequested ?? false)
+        while (!_statisticsCancellationTokenSource!.Token.IsCancellationRequested)
         {
             try
             {
-                await Task.Delay(30000, _statisticsCancellationTokenSource.Token); // 每30秒输出一次统计信息
+                await Task.Delay(30000, _statisticsCancellationTokenSource.Token); // 30秒输出一次
 
-                if (_isRunning && _connectionManager != null)
+                if (_connectionManager != null)
                 {
                     var stats = _connectionManager.GetStatistics();
-                    Console.WriteLine($"服务器统计: 总连接 {stats.TotalConnections}, 用户连接 {stats.UserConnections}, 活跃连接 {stats.ActiveConnections}");
+                    ConsoleWriter.WriteLine($"统计信息 - 总连接: {stats.TotalConnections}, 用户连接: {stats.UserConnections}, 活跃: {stats.ActiveConnections}, 非活跃: {stats.InactiveConnections}");
                 }
             }
-            catch (OperationCanceledException) when (_statisticsCancellationTokenSource?.IsCancellationRequested ?? false)
+            catch (OperationCanceledException)
             {
-                // 统计任务已取消，正常退出
-                break;
-            }
-            catch (ObjectDisposedException)
-            {
-                // 连接管理器已被释放，正常退出
                 break;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"输出统计信息时发生错误: {ex.Message}");
+                ConsoleWriter.WriteLine($"输出统计信息时发生错误: {ex.Message}");
             }
         }
     }
 
+    /// <summary>
+    /// 检查是否已释放
+    /// </summary>
     private void CheckDisposed()
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(WrapServer));
     }
 
+    /// <summary>
+    /// 释放资源
+    /// </summary>
     public void Dispose()
     {
         if (_disposed) return;
 
         _disposed = true;
 
-        // 停止服务器（异步执行，不等待完成）
-        if (_isRunning)
+        try
         {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await StopAsync();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Dispose时停止服务器发生错误: {ex.Message}");
-                }
-            });
+            // 异步停止服务器，但不等待完成
+            _ = StopAsync();
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"释放服务器时发生错误: {ex.Message}");
+        }
+    }
 
-        // 确保取消令牌被释放
-        _statisticsCancellationTokenSource?.Cancel();
-        _statisticsCancellationTokenSource?.Dispose();
-        _statisticsCancellationTokenSource = null;
+    public CommandManager GetCommandManager()
+    {
+        return _commandManager;
+    }
 
-        GC.SuppressFinalize(this);
+    public IConnectionManager GetConnectionManager()
+    {
+        return _connectionManager!;
+    }
+
+    public LoggingService GetLoggingService()
+    {
+        return _loggingService;
     }
 }
+

@@ -1,7 +1,6 @@
-using System;
 using DotNetty.Transport.Channels;
+using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol;
-using Wrap.Remastered.Server.Handlers;
 
 namespace Wrap.Remastered.Server.Handlers.PacketHandlers;
 
@@ -10,14 +9,14 @@ namespace Wrap.Remastered.Server.Handlers.PacketHandlers;
 /// </summary>
 public class UnknownPacketHandler : BasePacketHandler
 {
-    public UnknownPacketHandler(IConnectionManager connectionManager) : base(connectionManager)
+    public UnknownPacketHandler(IWrapServer server) : base(server)
     {
     }
 
     protected override void OnHandle(IChannel channel, UnsolvedPacket packet)
     {
         LogInfo(channel, packet, $"收到未知数据包类型: {packet.PacketType}, 数据长度: {packet.Data.Length} 字节");
-        
+
         // 可以选择记录数据包内容用于调试
         if (packet.Data.Length > 0)
         {
@@ -30,4 +29,4 @@ public class UnknownPacketHandler : BasePacketHandler
     {
         LogInfo(channel, packet, $"处理未知数据包时发生错误: {exception.Message}");
     }
-} 
+}

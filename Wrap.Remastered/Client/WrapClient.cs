@@ -17,32 +17,67 @@ using System.Net;
 using Wrap.Remastered.Network.Protocol.ServerBound;
 using System.Net.Sockets;
 using Wrap.Remastered.Network.Protocol.ClientBound;
+using Wrap.Remastered.Client;
 
 namespace Wrap.Remastered.Client;
 
 public class WrapClient : IWrapClient, IDisposable
 {
-    private readonly UserInfo _userInfo;
+    private UserInfo? _userInfo;
     private IEventLoopGroup? _eventLoopGroup;
     private IChannel? _clientChannel;
     private volatile bool _isConnected = false;
     private volatile bool _disposed = false;
+    private volatile bool _isLoggedIn = false;
+    private UserProfile _profile = UserProfile.Load();
 
     public bool Disposed => _disposed;
     public bool IsConnected => _isConnected && _clientChannel?.Active == true;
+    public bool IsLoggedIn => _isLoggedIn;
 
-    public string UserId => _userInfo.UserId;
-    public string Name => _userInfo.Name;
-    public string DisplayName => _userInfo.DisplayName;
+    public string? UserId => _userInfo?.UserId;
+    public string? Name => _userInfo?.Name ?? _profile.Name;
+    public string? DisplayName => _userInfo?.DisplayName ?? _profile.DisplayName;
+    public UserProfile Profile => _profile;
 
     public event EventHandler? Connected;
     public event EventHandler? Disconnected;
     public event EventHandler<UnsolvedPacket>? DataReceived;
     public event EventHandler<IClientBoundPacket>? PacketReceived;
+    public event EventHandler<UserInfo>? LoggedIn;
 
+    /// <summary>
+    /// 无参数构造函数
+    /// </summary>
+    public WrapClient()
+    {
+    }
+
+    /// <summary>
+    /// 带用户信息的构造函数
+    /// </summary>
+    /// <param name="userInfo">用户信息</param>
     public WrapClient(UserInfo userInfo)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+    }
+
+    /// <summary>
+    /// 设置用户信息
+    /// </summary>
+    /// <param name="userInfo">用户信息</param>
+    public void SetUserInfo(UserInfo userInfo)
+    {
+        _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+    }
+
+    /// <summary>
+    /// 获取用户信息
+    /// </summary>
+    /// <returns>用户信息</returns>
+    public UserInfo? GetUserInfo()
+    {
+        return _userInfo;
     }
 
     public async Task ConnectAsync(string serverAddress, int port = 10270)
@@ -102,8 +137,6 @@ public class WrapClient : IWrapClient, IDisposable
             _clientChannel = await bootstrap.ConnectAsync(endpoint);
             _isConnected = true;
 
-            await SendLoginPacketAsync();
-
             Connected?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception)
@@ -128,6 +161,7 @@ public class WrapClient : IWrapClient, IDisposable
         try
         {
             _isConnected = false;
+            _isLoggedIn = false;
 
             if (_clientChannel != null)
             {
@@ -196,34 +230,49 @@ public class WrapClient : IWrapClient, IDisposable
     /// <summary>
     /// 发送登录数据包
     /// </summary>
-    private async Task SendLoginPacketAsync()
+    public async Task SendLoginPacketAsync()
     {
+        if (_userInfo == null)
+        {
+            throw new InvalidOperationException("用户信息未设置，无法发送登录数据包");
+        }
+
         var loginPacket = new LoginPacket(_userInfo);
         await SendPacketAsync(loginPacket);
     }
 
     /// <summary>
-    /// 处理接收到的数据
+    /// 发送登录数据包（公开方法）
     /// </summary>
-    /// <param name="data">接收到的数据</param>
+    public async Task SendLoginPacketAsync(UserInfo userInfo)
+    {
+        SetUserInfo(userInfo);
+        await SendLoginPacketAsync();
+    }
+
+    /// <summary>
+    /// 处理登录成功
+    /// </summary>
+    /// <param name="userInfo">服务器返回的用户信息</param>
+    internal void OnLoginSuccess(UserInfo userInfo)
+    {
+        _userInfo = userInfo;
+        _isLoggedIn = true;
+        // 自动保存用户名和显示名
+        if (!string.IsNullOrWhiteSpace(userInfo.Name)) _profile.Name = userInfo.Name;
+        if (!string.IsNullOrWhiteSpace(userInfo.DisplayName)) _profile.DisplayName = userInfo.DisplayName;
+        _profile.Save();
+        LoggedIn?.Invoke(this, userInfo);
+    }
+
     internal void OnDataReceived(UnsolvedPacket unsolved)
     {
-        try
-        {
-            DataReceived?.Invoke(this, unsolved);
+        DataReceived?.Invoke(this, unsolved);
+    }
 
-            // 检查是否有对应的序列化器
-            if (IClientBoundPacket.Serializers.TryGetValue((ClientBoundPacketType)unsolved.PacketType, out var serializer))
-            {
-                IClientBoundPacket packet = (IClientBoundPacket)serializer.Deserialize(unsolved.Data);
-                
-                PacketReceived?.Invoke(this, packet);
-            }
-        }
-        catch (Exception ex)
-        {
-            // 静默处理异常
-        }
+    internal void OnPacketReceived(IClientBoundPacket packet)
+    {
+        PacketReceived?.Invoke(this, packet);
     }
 
     private void CheckDisposed()
@@ -235,10 +284,18 @@ public class WrapClient : IWrapClient, IDisposable
     public void Dispose()
     {
         if (_disposed) return;
+
         _disposed = true;
 
-        Disconnect();
-        GC.SuppressFinalize(this);
+        try
+        {
+            // 异步断开连接，但不等待完成
+            _ = DisconnectAsync();
+        }
+        catch (Exception)
+        {
+            // 忽略断开连接时的错误
+        }
     }
 }
 

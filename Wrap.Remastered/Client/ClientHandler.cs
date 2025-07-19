@@ -7,6 +7,8 @@ using System.Text;
 using System.Threading.Tasks;
 using Wrap.Remastered.Network.Protocol;
 using Wrap.Remastered.Network.Protocol.ServerBound;
+using Wrap.Remastered.Network.Protocol.ClientBound;
+using Wrap.Remastered.Schemas;
 
 namespace Wrap.Remastered.Client;
 
@@ -68,7 +70,11 @@ public class ClientHandler : ChannelHandlerAdapter
                 var data = new byte[buffer.ReadableBytes];
                 buffer.ReadBytes(data);
 
-                _client.OnDataReceived(new UnsolvedPacket(packetType, data));
+                var unsolvedPacket = new UnsolvedPacket(packetType, data);
+                _client.OnDataReceived(unsolvedPacket);
+
+                // 尝试解析为具体的客户端数据包
+                TryParseClientBoundPacket(packetType, data);
             }
         }
         catch (Exception) { }
@@ -78,6 +84,42 @@ public class ClientHandler : ChannelHandlerAdapter
             {
                 buffer.Release();
             }
+        }
+    }
+
+    /// <summary>
+    /// 尝试解析客户端数据包
+    /// </summary>
+    /// <param name="packetType">数据包类型</param>
+    /// <param name="data">数据</param>
+    private void TryParseClientBoundPacket(int packetType, byte[] data)
+    {
+        try
+        {
+            if (IClientBoundPacket.Serializers.TryGetValue((ClientBoundPacketType)packetType, out var serializer))
+            {
+                var packet = serializer.Deserialize(data) as IClientBoundPacket;
+                if (packet != null)
+                {
+                    _client.OnPacketReceived(packet);
+
+                    // 处理登录成功响应
+                    if (packet is LoginSucceedPacket loginSucceed)
+                    {
+                        var userInfo = new UserInfo
+                        {
+                            UserId = loginSucceed.UserId,
+                            Name = loginSucceed.Name,
+                            DisplayName = loginSucceed.DisplayName
+                        };
+                        _client.OnLoginSuccess(userInfo);
+                    }
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // 忽略解析错误
         }
     }
 

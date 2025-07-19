@@ -1,14 +1,11 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using DotNetty.Buffers;
 using DotNetty.Transport.Channels;
-using Wrap.Remastered.Schemas;
+using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol;
 using Wrap.Remastered.Network.Protocol.ServerBound;
+using Wrap.Remastered.Schemas;
 using Wrap.Remastered.Server.Handlers.PacketHandlers;
+using Wrap.Remastered.Server.Managers;
 
 namespace Wrap.Remastered.Server.Handlers;
 
@@ -17,7 +14,7 @@ namespace Wrap.Remastered.Server.Handlers;
 /// </summary>
 public class ServerHandler : ChannelHandlerAdapter
 {
-    private readonly IConnectionManager _connectionManager;
+    private readonly IWrapServer _server;
     private readonly IEventLoopGroup _eventLoopGroup;
     private readonly IPacketHandlerFactory _packetHandlerFactory;
 
@@ -26,11 +23,11 @@ public class ServerHandler : ChannelHandlerAdapter
     /// </summary>
     /// <param name="connectionManager">连接管理器</param>
     /// <param name="eventLoopGroup">事件循环组</param>
-    public ServerHandler(IConnectionManager connectionManager, IEventLoopGroup eventLoopGroup)
+    public ServerHandler(IWrapServer server, IEventLoopGroup eventLoopGroup)
     {
-        _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
+        _server = server ?? throw new ArgumentNullException(nameof(server));
         _eventLoopGroup = eventLoopGroup ?? throw new ArgumentNullException(nameof(eventLoopGroup));
-        _packetHandlerFactory = new PacketHandlerFactory(connectionManager);
+        _packetHandlerFactory = new PacketHandlerFactory(_server);
     }
 
     /// <summary>
@@ -41,12 +38,12 @@ public class ServerHandler : ChannelHandlerAdapter
     {
         var channel = context.Channel;
         var remoteAddress = channel.RemoteAddress;
-        
-        Console.WriteLine($"客户端连接: {remoteAddress}");
-        
+
+        _server.GetLoggingService().LogConnection("客户端连接: {0}", remoteAddress);
+
         // 通知连接管理器有新连接
-        _connectionManager.OnClientConnected(channel);
-        
+        _server.GetConnectionManager().OnClientConnected(channel);
+
         base.ChannelActive(context);
     }
 
@@ -60,11 +57,11 @@ public class ServerHandler : ChannelHandlerAdapter
         {
             var channel = context.Channel;
             var remoteAddress = channel.RemoteAddress;
-            
-            Console.WriteLine($"客户端断开: {remoteAddress}");
-            
+
+            _server.GetLoggingService().LogConnection("客户端断开: {0}", remoteAddress);
+
             // 通知连接管理器连接断开
-            _connectionManager.OnClientDisconnected(channel);
+            _server.GetConnectionManager().OnClientDisconnected(channel);
         }
         catch (ObjectDisposedException)
         {
@@ -72,7 +69,7 @@ public class ServerHandler : ChannelHandlerAdapter
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"处理客户端断开时发生错误: {ex.Message}");
+            _server.GetLoggingService().LogError("Connection", "处理客户端断开时发生错误", ex);
         }
         finally
         {
@@ -99,16 +96,16 @@ public class ServerHandler : ChannelHandlerAdapter
 
                 // 读取数据包类型（4字节）
                 int packetType = buffer.ReadInt();
-                
+
                 // 读取剩余的数据部分
                 var data = new byte[buffer.ReadableBytes];
                 buffer.ReadBytes(data);
 
-                Console.WriteLine($"接收到数据包: 类型={packetType}, 数据长度={data.Length} 字节");
+                _server.GetLoggingService().LogPacket("接收到数据包: 类型={0}, 数据长度={1} 字节", packetType, data.Length);
 
                 // 创建未解析的数据包
                 var unsolvedPacket = new UnsolvedPacket(packetType, data);
-                
+
                 // 处理接收到的数据包
                 ProcessReceivedPacket(context.Channel, unsolvedPacket);
             }
@@ -119,7 +116,7 @@ public class ServerHandler : ChannelHandlerAdapter
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"处理数据包时发生错误: {ex.Message}");
+            _server.GetLoggingService().LogError("Packet", "处理数据包时发生错误", ex);
         }
         finally
         {
@@ -138,7 +135,7 @@ public class ServerHandler : ChannelHandlerAdapter
     /// <param name="exception">异常</param>
     public override void ExceptionCaught(IChannelHandlerContext context, Exception exception)
     {
-        Console.WriteLine($"通道异常: {exception.Message}");
+        _server.GetLoggingService().LogError("Connection", "通道异常", exception, "通道: {0}", context.Channel.RemoteAddress);
 
         // 关闭通道
         _ = context.CloseAsync();
@@ -153,11 +150,12 @@ public class ServerHandler : ChannelHandlerAdapter
     {
         try
         {
-            Console.WriteLine($"处理来自 {channel.RemoteAddress} 的数据包: 类型={packet.PacketType}, 数据长度={packet.Data.Length} 字节");
-            
+            _server.GetLoggingService().LogPacket("处理来自 {0} 的数据包: 类型={1}, 数据长度={2} 字节",
+                channel.RemoteAddress, packet.PacketType, packet.Data.Length);
+
             // 更新连接活动时间
-            _connectionManager.UpdateConnectionActivity(channel);
-            
+            _server.GetConnectionManager().UpdateConnectionActivity(channel);
+
             // 使用数据包处理器工厂处理数据包
             var handler = _packetHandlerFactory.GetHandler(packet.PacketType);
             if (handler != null)
@@ -166,7 +164,7 @@ public class ServerHandler : ChannelHandlerAdapter
             }
             else
             {
-                Console.WriteLine($"未找到数据包类型 {packet.PacketType} 的处理器");
+                _server.GetLoggingService().LogWarning("Packet", "未找到数据包类型 {0} 的处理器", packet.PacketType);
             }
         }
         catch (ObjectDisposedException)
@@ -175,7 +173,7 @@ public class ServerHandler : ChannelHandlerAdapter
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"处理数据包时发生错误: {ex.Message}");
+            _server.GetLoggingService().LogError("Packet", "处理数据包时发生错误", ex, "通道: {0}", channel.RemoteAddress);
         }
     }
 }
@@ -211,18 +209,18 @@ public interface IPacketHandlerFactory
 /// </summary>
 public class PacketHandlerFactory : IPacketHandlerFactory
 {
-    private readonly IConnectionManager _connectionManager;
+    private readonly IWrapServer _server;
     private readonly Dictionary<int, IPacketHandler> _handlers;
     private readonly IPacketHandler _unknownHandler;
 
-    public PacketHandlerFactory(IConnectionManager connectionManager)
+    public PacketHandlerFactory(IWrapServer server)
     {
-        _connectionManager = connectionManager;
-        _unknownHandler = new UnknownPacketHandler(connectionManager);
-        
+        _server = server;
+        _unknownHandler = new UnknownPacketHandler(server);
+
         _handlers = new Dictionary<int, IPacketHandler>
         {
-            { (int)ServerBoundPacketType.LoginPacket, new LoginPacketHandler(connectionManager) }
+            { (int)ServerBoundPacketType.LoginPacket, new LoginPacketHandler(server) }
         };
     }
 
@@ -233,7 +231,7 @@ public class PacketHandlerFactory : IPacketHandlerFactory
         {
             return handler;
         }
-        
+
         // 否则返回未知数据包处理器
         return _unknownHandler;
     }
@@ -247,7 +245,7 @@ public class PacketHandlerFactory : IPacketHandlerFactory
     {
         if (handler == null)
             throw new ArgumentNullException(nameof(handler));
-            
+
         _handlers[packetType] = handler;
     }
 
@@ -271,16 +269,27 @@ public interface IConnectionManager
     /// </summary>
     /// <param name="channel">通道</param>
     void OnClientConnected(IChannel channel);
-    
+
     /// <summary>
     /// 客户端断开时调用
     /// </summary>
     /// <param name="channel">通道</param>
     void OnClientDisconnected(IChannel channel);
-    
+    void SetUserInfo(IChannel channel, UserInfo serverUserInfo);
+
     /// <summary>
     /// 更新连接活动时间
     /// </summary>
     /// <param name="channel">通道</param>
     void UpdateConnectionActivity(IChannel channel);
-} 
+
+    IEnumerable<ChannelConnection> GetAllUserConnections();
+
+    IEnumerable<ChannelConnection> GetAllConnections();
+
+    bool DisconnectUser(string userId);
+
+    ConnectionStatistics GetStatistics();
+
+    Task<int> BroadcastToUsersAsync(byte[] data, string? excludeUserId = null);
+}

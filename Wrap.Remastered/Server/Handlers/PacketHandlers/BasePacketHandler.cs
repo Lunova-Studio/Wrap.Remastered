@@ -1,7 +1,9 @@
 using System;
 using DotNetty.Transport.Channels;
+using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol;
 using Wrap.Remastered.Server.Handlers;
+using Wrap.Remastered.Server.Services;
 
 namespace Wrap.Remastered.Server.Handlers.PacketHandlers;
 
@@ -10,11 +12,11 @@ namespace Wrap.Remastered.Server.Handlers.PacketHandlers;
 /// </summary>
 public abstract class BasePacketHandler : IPacketHandler
 {
-    protected readonly IConnectionManager ConnectionManager;
+    protected IWrapServer Server { get; private set; }
 
-    protected BasePacketHandler(IConnectionManager connectionManager)
+    protected BasePacketHandler(IWrapServer server)
     {
-        ConnectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
+        Server = server ?? throw new ArgumentNullException(nameof(server));
     }
 
     /// <summary>
@@ -30,7 +32,8 @@ public abstract class BasePacketHandler : IPacketHandler
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"处理数据包时发生错误: {ex.Message}");
+            Server.GetLoggingService().LogError("Packet", "处理数据包时发生错误", ex, "通道: {0}, 数据包类型: {1}", 
+                channel.RemoteAddress, packet.PacketType);
             OnError(channel, packet, ex);
         }
     }
@@ -50,7 +53,8 @@ public abstract class BasePacketHandler : IPacketHandler
     /// <param name="exception">异常</param>
     protected virtual void OnError(IChannel channel, UnsolvedPacket packet, Exception exception)
     {
-        Console.WriteLine($"数据包处理错误: 通道={channel.RemoteAddress}, 数据包类型={packet.PacketType}, 错误={exception.Message}");
+        Server.GetLoggingService().LogError("Packet", "数据包处理错误", exception, "通道: {0}, 数据包类型: {1}", 
+            channel.RemoteAddress, packet.PacketType);
     }
 
     /// <summary>
@@ -59,8 +63,8 @@ public abstract class BasePacketHandler : IPacketHandler
     /// <param name="channel">通道</param>
     /// <param name="packet">数据包</param>
     /// <param name="message">日志消息</param>
-    protected virtual void LogInfo(IChannel channel, UnsolvedPacket packet, string message)
+    protected virtual void LogInfo(IChannel channel, UnsolvedPacket? packet, string message)
     {
-        Console.WriteLine($"[{packet.PacketType}] {channel.RemoteAddress}: {message}");
+        Server.GetLoggingService().LogPacket("{0} - 通道: {1}", message, channel.RemoteAddress);
     }
 } 

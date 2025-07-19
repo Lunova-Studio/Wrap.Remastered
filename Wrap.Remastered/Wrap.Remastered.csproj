@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\refs\NatTypeTester\src\STUN\STUN.csproj" />
+    <ProjectReference Include="..\refs\ConsoleInteractive\ConsoleInteractive\ConsoleInteractive\ConsoleInteractive.csproj" />
   </ItemGroup>
 
   <ItemGroup>

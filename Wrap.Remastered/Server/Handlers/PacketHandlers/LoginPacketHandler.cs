@@ -1,9 +1,9 @@
-using System;
 using DotNetty.Transport.Channels;
+using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol;
+using Wrap.Remastered.Network.Protocol.ClientBound;
 using Wrap.Remastered.Network.Protocol.ServerBound;
-using Wrap.Remastered.Server.Handlers;
-using Wrap.Remastered.Server.Managers;
+using Wrap.Remastered.Schemas;
 
 namespace Wrap.Remastered.Server.Handlers.PacketHandlers;
 
@@ -12,30 +12,119 @@ namespace Wrap.Remastered.Server.Handlers.PacketHandlers;
 /// </summary>
 public class LoginPacketHandler : BasePacketHandler
 {
-    public LoginPacketHandler(IConnectionManager connectionManager) : base(connectionManager)
+
+    public LoginPacketHandler(IWrapServer server) : base(server)
     {
+
     }
 
     protected override void OnHandle(IChannel channel, UnsolvedPacket packet)
     {
-        // 反序列化登录数据包
-        var loginPacket = LoginPacket.Serializer.Deserialize(packet.Data) as LoginPacket;
-        if (loginPacket == null)
+        try
         {
-            LogInfo(channel, packet, "登录数据包反序列化失败");
-            return;
+            // 反序列化登录数据包
+            var loginPacket = LoginPacket.Serializer.Deserialize(packet.Data) as LoginPacket;
+            if (loginPacket == null)
+            {
+                Server.GetLoggingService().LogError("Packet", "登录数据包反序列化失败", null, "通道: {0}", channel.RemoteAddress);
+                SendLoginFailedResponse(channel, "INVALID_PACKET", "数据包格式错误");
+                return;
+            }
+
+            Server.GetLoggingService().LogUser("收到登录请求: {0}", loginPacket.DisplayName);
+
+            // 生成唯一的用户ID
+            var userId = Guid.NewGuid().ToString();
+
+            // 创建新的用户信息，使用服务器生成的用户ID
+            var serverUserInfo = new UserInfo
+            {
+                UserId = userId,
+                Name = loginPacket.Name,
+                DisplayName = loginPacket.DisplayName
+            };
+
+            // 设置用户信息到连接
+            Server.GetConnectionManager().SetUserInfo(channel, serverUserInfo);
+
+            Server.GetLoggingService().LogUser("用户登录成功: {0} (ID: {1})", serverUserInfo.DisplayName, serverUserInfo.UserId);
+
+            // 发送登录成功响应
+            SendLoginSucceedResponse(channel, serverUserInfo);
         }
-
-        LogInfo(channel, packet, $"用户登录: UserId={loginPacket.UserId}, Name={loginPacket.Name}, DisplayName={loginPacket.DisplayName}");
-
-        // 创建用户信息
-        var userInfo = loginPacket.AsUserInfo();
-
-        // 设置用户信息到连接管理器
-        if (ConnectionManager is DotNettyConnectionManager connectionManager)
+        catch (Exception ex)
         {
-            connectionManager.SetUserInfo(channel, userInfo);
-            LogInfo(channel, packet, $"用户 {userInfo.UserId} 登录成功");
+            Server.GetLoggingService().LogError("User", "处理登录请求时发生错误", ex);
+            SendLoginFailedResponse(channel, "SERVER_ERROR", "服务器内部错误");
         }
     }
-} 
+
+    /// <summary>
+    /// 发送登录成功响应
+    /// </summary>
+    private void SendLoginSucceedResponse(IChannel channel, UserInfo userInfo)
+    {
+        try
+        {
+            var loginSucceedPacket = new LoginSucceedPacket
+            {
+                UserId = userInfo.UserId,
+                Name = userInfo.Name,
+                DisplayName = userInfo.DisplayName,
+                LoginTime = DateTime.UtcNow
+            };
+
+            SendPacketAsync(channel, loginSucceedPacket).Wait();
+            Server.GetLoggingService().LogUser("已发送登录成功响应给用户: {0}", userInfo.DisplayName);
+        }
+        catch (Exception ex)
+        {
+            Server.GetLoggingService().LogError("User", "发送登录成功响应时发生错误", ex);
+        }
+    }
+
+    /// <summary>
+    /// 发送登录失败响应
+    /// </summary>
+    private void SendLoginFailedResponse(IChannel channel, string errorCode, string errorMessage)
+    {
+        try
+        {
+            var loginFailedPacket = new LoginFailedPacket
+            {
+                ErrorCode = 500,
+                ErrorMessage = errorMessage,
+                FailTime = DateTime.UtcNow
+            };
+
+            SendPacketAsync(channel, loginFailedPacket).Wait();
+            Server.GetLoggingService().LogUser("已发送登录失败响应: {0} - {1}", errorCode, errorMessage);
+        }
+        catch (Exception ex)
+        {
+            Server.GetLoggingService().LogError("User", "发送登录失败响应时发生错误", ex);
+        }
+    }
+
+    private async Task SendPacketAsync(IChannel channel, IClientBoundPacket packet)
+    {
+        try
+        {
+            var serializer = packet.GetSerializer();
+            var data = serializer.Serialize(packet);
+            packet.OnSerialize(ref data);
+
+            // 创建包含数据包类型和数据的完整数据包
+            var packetData = new byte[4 + data.Length];
+            BitConverter.GetBytes((int)packet.GetPacketType()).CopyTo(packetData, 0);
+            data.CopyTo(packetData, 4);
+
+            var buffer = DotNetty.Buffers.Unpooled.WrappedBuffer(packetData);
+            await channel.WriteAndFlushAsync(buffer);
+        }
+        catch (Exception ex)
+        {
+            Server.GetLoggingService().LogError("User", "发送数据包时发生错误", ex);
+        }
+    }
+}

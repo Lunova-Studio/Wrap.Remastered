@@ -7,8 +7,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using DotNetty.Buffers;
 using DotNetty.Transport.Channels;
+using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Schemas;
 using Wrap.Remastered.Server.Handlers;
+using Wrap.Remastered.Server.Services;
 
 namespace Wrap.Remastered.Server.Managers;
 
@@ -21,6 +23,7 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
     private readonly ConcurrentDictionary<string, ChannelConnection> _userConnections;
     private readonly Timer _cleanupTimer;
     private volatile bool _disposed = false;
+    private readonly IWrapServer _server;
 
     /// <summary>
     /// 连接事件
@@ -33,8 +36,9 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
     /// 构造函数
     /// </summary>
     /// <param name="cleanupInterval">清理间隔（毫秒）</param>
-    public DotNettyConnectionManager(int cleanupInterval = 30000)
+    public DotNettyConnectionManager(IWrapServer server, int cleanupInterval = 30000)
     {
+        _server = server;
         _connections = new ConcurrentDictionary<IChannel, ChannelConnection>();
         _userConnections = new ConcurrentDictionary<string, ChannelConnection>();
         
@@ -67,7 +71,7 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
         
         if (_connections.TryAdd(channel, connection))
         {
-            Console.WriteLine($"新客户端连接: {channel.RemoteAddress}");
+            _server.GetLoggingService().LogConnection("新客户端连接: {0}", channel.RemoteAddress);
             ClientConnected?.Invoke(this, new ChannelConnectionEventArgs(connection));
         }
     }
@@ -83,7 +87,7 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
 
         if (_connections.TryRemove(channel, out var connection))
         {
-            Console.WriteLine($"客户端断开: {channel.RemoteAddress}");
+            _server.GetLoggingService().LogConnection("客户端断开: {0}", channel.RemoteAddress);
             
             // 如果连接有用户信息，也从用户连接字典中移除
             if (!string.IsNullOrEmpty(connection.UserId))
@@ -129,7 +133,7 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
             // 添加到用户连接字典
             _userConnections.TryAdd(userInfo.UserId, connection);
             
-            Console.WriteLine($"用户 {userInfo.UserId} 已关联到通道 {channel.RemoteAddress}");
+            _server.GetLoggingService().LogUser("用户 {0} 已关联到通道 {1}", userInfo.UserId, channel.RemoteAddress);
         }
     }
 
@@ -370,12 +374,12 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
 
             if (inactiveConnections.Count > 0)
             {
-                Console.WriteLine($"清理了 {inactiveConnections.Count} 个非活跃连接");
+                _server.GetLoggingService().LogConnection("清理了 {0} 个非活跃连接", inactiveConnections.Count);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"清理连接时发生错误: {ex.Message}");
+            _server.GetLoggingService().LogError("Connection", "清理连接时发生错误", ex);
         }
     }
 
