@@ -3,7 +3,7 @@ using System.Net.Sockets;
 using STUN.Enums;
 using STUN.StunResult;
 using STUN.Client;
-using STUN.Proxy;
+using Wrap.Remastered.STUN;
 
 namespace Wrap.Remastered.Helpers;
 
