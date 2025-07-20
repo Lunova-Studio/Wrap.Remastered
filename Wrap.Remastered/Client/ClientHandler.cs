@@ -104,7 +104,9 @@ public class ClientHandler : ChannelHandlerAdapter
                     if (packet is LoginSucceedPacket loginSucceed)
                     {
                         _client.RemoteIP = new IPEndPoint(new IPAddress(loginSucceed.IPAddress), loginSucceed.Port);
-                        _client.UPnPService?.AddPortMapping(_client.RemoteIP.Port, IUPnPService.SocketProtocol.TCP, ((IPEndPoint)_client._clientChannel!.LocalAddress).Port, "WrapClient");
+#pragma warning disable VSTHRD110 // Observe result of async calls
+                        _ = _client.UPnPService?.AddPortMappingAsync(_client.RemoteIP.Port, IUPnPService.SocketProtocol.TCP, ((IPEndPoint)_client._clientChannel!.LocalAddress).Port, "WrapClient");
+#pragma warning restore VSTHRD110 // Observe result of async calls
                         var userInfo = new UserInfo
                         {
                             UserId = loginSucceed.UserId,
