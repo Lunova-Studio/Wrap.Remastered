@@ -60,8 +60,7 @@ public static class StreamExtensions
     }
     public static int ReadInt32(this Stream stream)
     {
-        byte[] buffer = new byte[4];
-        stream.Read(buffer);
+        byte[] buffer = stream.ReadBytes(4);
         return BitConverter.ToInt32(buffer);
     }
     public static short ReadInt16(this Stream stream)
@@ -142,8 +141,13 @@ public static class StreamExtensions
     // 字节数组读写方法
     public static byte[] ReadBytes(this Stream stream, int count)
     {
+        int rest = count;
         byte[] buffer = new byte[count];
-        stream.Read(buffer);
+        while (rest > 0)
+        {
+            int readed =  stream.Read(buffer, count - rest, rest);
+            rest -= readed;
+        }
         return buffer;
     }
     

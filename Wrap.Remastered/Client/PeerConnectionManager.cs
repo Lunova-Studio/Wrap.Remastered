@@ -1,8 +1,12 @@
 using ConsoleInteractive;
+using DotNetty.Common;
 using System.Net;
 using System.Net.Sockets;
+using Wrap.Remastered.Extensions;
 using Wrap.Remastered.Interfaces;
+using Wrap.Remastered.Network.Protocol;
 using Wrap.Remastered.Network.Protocol.PeerBound;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Wrap.Remastered.Client;
 
@@ -45,6 +49,8 @@ public class PeerConnectionInfo
     /// 最后发送心跳的时间
     /// </summary>
     public DateTime LastSentKeepAlive { get; set; } = DateTime.UtcNow;
+
+    public SemaphoreSlim WriteLock { get; } = new(1, 1);
 }
 
 /// <summary>
@@ -57,6 +63,8 @@ public class PeerConnectionManager : IDisposable
     private Timer _keepAliveTimer;
     private Timer _keepAliveTimeoutTimer;
     private bool _disposed = false;
+    private readonly Dictionary<string, long> _lastSequenceId = new();
+    private readonly Dictionary<string, SortedDictionary<long, ProxyDataPacket>> _pendingPackets = new();
 
     // P2P连接状态事件
     public event EventHandler<string>? PeerConnected;
@@ -262,6 +270,7 @@ public class PeerConnectionManager : IDisposable
     /// <param name="packet">数据包</param>
     public async Task SendPacketAsync(string targetUserId, IPeerBoundPacket packet)
     {
+        ConsoleWriter.WriteLine($"[P2P] SendPacketAsync packetType: {packet.GetPacketType()} to {targetUserId}");
         if (string.IsNullOrEmpty(targetUserId)) throw new ArgumentNullException(nameof(targetUserId));
         if (packet == null) throw new ArgumentNullException(nameof(packet));
 
@@ -288,10 +297,19 @@ public class PeerConnectionManager : IDisposable
 
             if (connectionInfo.NetworkStream != null)
             {
-                await connectionInfo.NetworkStream.WriteAsync(packetData, 0, packetData.Length);
-                await connectionInfo.NetworkStream.FlushAsync();
-                
-                ConsoleWriter.WriteLine($"[P2P] 向 {targetUserId} 发送数据包: {packet.GetPacketType()}");
+                await connectionInfo.WriteLock.WaitAsync();
+                try
+                {
+                    ConsoleWriter.WriteLine($"[P2P] Write to {targetUserId} type={packet.GetPacketType()} size={packetData.Length}");
+                    connectionInfo.NetworkStream.WriteInt(packetData.Length);
+                    await connectionInfo.NetworkStream.WriteAsync(packetData, 0, packetData.Length);
+                    await connectionInfo.NetworkStream.FlushAsync();
+                    ConsoleWriter.WriteLine($"[P2P] Write to {targetUserId} finished type={packet.GetPacketType()} size={packetData.Length}");
+                }
+                finally
+                {
+                    connectionInfo.WriteLock.Release();
+                }
             }
         }
         catch (Exception ex)
@@ -387,17 +405,9 @@ public class PeerConnectionManager : IDisposable
             {
                 if (connectionInfo.NetworkStream == null) break;
 
-                var bytesRead = await connectionInfo.NetworkStream.ReadAsync(buffer, 0, buffer.Length);
-                if (bytesRead == 0)
-                {
-                    break; // 连接已关闭
-                }
-
-                // 处理接收到的数据
-                var data = new byte[bytesRead];
-                Array.Copy(buffer, data, bytesRead);
+                var bytesRead = connectionInfo.NetworkStream.ReadInt32();
+                var data = connectionInfo.NetworkStream.ReadBytes(bytesRead);
                 
-                ConsoleWriter.WriteLine($"[P2P] 收到来自 {connectionInfo.TargetUserId} 的数据: {bytesRead} 字节");
                 await ProcessReceivedDataAsync(connectionInfo.TargetUserId, data);
             }
         }
@@ -431,6 +441,8 @@ public class PeerConnectionManager : IDisposable
             var packetData = new byte[data.Length - 4];
             Array.Copy(data, 4, packetData, 0, packetData.Length);
 
+
+            ConsoleWriter.WriteLine($"[P2P] 收到来自 {targetUserId} 的数据包类型: {((PeerBoundPacketType)packetType).ToString()}");
             // 根据数据包类型处理
             switch ((PeerBoundPacketType)packetType)
             {
@@ -453,7 +465,6 @@ public class PeerConnectionManager : IDisposable
                     await HandleProxyResponsePacketAsync(targetUserId, packetData);
                     break;
                 default:
-                    ConsoleWriter.WriteLine($"[P2P] 收到来自 {targetUserId} 的未知数据包类型: {packetType}");
                     break;
             }
         }
@@ -584,34 +595,51 @@ public class PeerConnectionManager : IDisposable
         {
             var serializer = new ProxyDataPacketSerializer();
             var packet = (ProxyDataPacket)serializer.Deserialize(packetData);
-            
-            ConsoleWriter.WriteLine($"[P2P] 收到来自 {targetUserId} 的代理数据包: {packet.ConnectionId}, 大小: {packet.Data.Length} 字节");
-            
-            // 添加调试信息
-            ConsoleWriter.WriteLine($"[P2P] 调试信息: ProxyManager={_client.ProxyManager != null}, LocalProxyServer={_client.LocalProxyServer != null}");
-            
-            // 转发给代理管理器处理（房主端）
-            if (_client.ProxyManager != null)
+            // 顺序校验与缓存
+            if (!_lastSequenceId.TryGetValue(packet.ConnectionId, out var lastSeq))
+                lastSeq = 0;
+            if (!_pendingPackets.TryGetValue(packet.ConnectionId, out var buffer))
             {
-                ConsoleWriter.WriteLine($"[P2P] 转发代理数据包到代理管理器: {packet.ConnectionId}");
-                await _client.ProxyManager.HandleProxyDataAsync(
-                    packet.ConnectionId, packet.Data, packet.IsClientToServer);
+                buffer = new SortedDictionary<long, ProxyDataPacket>();
+                _pendingPackets[packet.ConnectionId] = buffer;
             }
-            // 转发给本地代理服务器处理（普通用户端）
-            else if (_client.LocalProxyServer != null)
+            if (packet.SequenceId == lastSeq + 1)
             {
-                ConsoleWriter.WriteLine($"[P2P] 转发代理数据包到本地代理服务器: {packet.ConnectionId}");
-                await _client.LocalProxyServer.HandleProxyDataAsync(
-                    packet.ConnectionId, packet.Data, packet.IsClientToServer);
+                // 正常顺序，处理并递增
+                await ProcessProxyDataPacketAsync(packet);
+                _lastSequenceId[packet.ConnectionId] = packet.SequenceId;
+                // 检查buffer中是否有后续包
+                while (buffer.TryGetValue(_lastSequenceId[packet.ConnectionId] + 1, out var nextPacket))
+                {
+                    buffer.Remove(_lastSequenceId[packet.ConnectionId] + 1);
+                    await ProcessProxyDataPacketAsync(nextPacket);
+                    _lastSequenceId[packet.ConnectionId]++;
+                }
             }
-            else
+            else if (packet.SequenceId > lastSeq + 1)
             {
-                ConsoleWriter.WriteLine($"[P2P] 代理管理器或本地代理服务器不可用，丢弃代理数据包: {packet.ConnectionId}");
+                // 乱序，缓存
+                buffer[packet.SequenceId] = packet;
             }
+            // 否则为重复包，直接丢弃
         }
         catch (Exception ex)
         {
             ConsoleWriter.WriteLine($"[P2P] 处理代理数据包时出错: {ex.Message}");
+        }
+    }
+    // 新增：实际处理ProxyDataPacket的方法
+    private async Task ProcessProxyDataPacketAsync(ProxyDataPacket packet)
+    {
+        if (packet.IsClientToServer)
+        {
+            await _client.ProxyManager.HandleProxyDataAsync(
+                packet.ConnectionId, packet);
+        }
+        else
+        {
+            ConsoleWriter.WriteLine($"[代理] ProcessProxyDataPacketAsync");
+            _client.LocalProxyServer.HandleProxyDataSync(packet.ConnectionId, packet);
         }
     }
 

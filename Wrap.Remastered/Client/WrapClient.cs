@@ -13,7 +13,6 @@ using Wrap.Remastered.Helpers;
 using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol;
 using Wrap.Remastered.Network.Protocol.ClientBound;
-using Wrap.Remastered.Network.Protocol.PeerBound;
 using Wrap.Remastered.Network.Protocol.ServerBound;
 using Wrap.Remastered.Schemas;
 using static Wrap.Remastered.Interfaces.IUPnPService;
@@ -229,7 +228,7 @@ public class WrapClient : IWrapClient, IDisposable
 
             if (_eventLoopGroup != null)
             {
-                await _eventLoopGroup.ShutdownGracefullyAsync();
+                _eventLoopGroup.ShutdownGracefullyAsync();
                 _eventLoopGroup = null;
             }
 

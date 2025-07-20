@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol.PeerBound;
+using System.Collections.Concurrent;
 
 namespace Wrap.Remastered.Client;
 
@@ -50,6 +51,13 @@ public class ProxyConnectionInfo
     /// 最后活动时间
     /// </summary>
     public DateTime LastActivity { get; set; } = DateTime.UtcNow;
+
+    public SemaphoreSlim WriteLock { get; } = new(1, 1);
+    public long SequenceIdCounter = 0;
+    // 新增：peer->目标服务器方向的队列和写入任务
+    public ConcurrentQueue<ProxyDataPacket> PeerToTargetQueue = new();
+    public CancellationTokenSource PeerToTargetCts = new();
+    public Task? PeerToTargetTask;
 }
 
 /// <summary>
@@ -128,8 +136,8 @@ public class ProxyManager : IDisposable
             // 添加连接映射
             _connectionMapping.AddMapping(connectionId, userId);
             
-            // 启动数据转发任务
-            _ = Task.Run(() => ForwardDataFromTargetAsync(connectionInfo));
+            // 启动同步转发线程
+            StartSyncForwarding(connectionInfo);
             
             ProxyConnectionEstablished?.Invoke(this, connectionId);
             
@@ -148,7 +156,7 @@ public class ProxyManager : IDisposable
     /// <param name="connectionId">连接ID</param>
     /// <param name="data">数据</param>
     /// <param name="isClientToServer">数据方向</param>
-    public async Task HandleProxyDataAsync(string connectionId, byte[] data, bool isClientToServer)
+    public async Task HandleProxyDataAsync(string connectionId, ProxyDataPacket packet)
     {
         if (!_connections.TryGetValue(connectionId, out var connectionInfo))
         {
@@ -166,50 +174,13 @@ public class ProxyManager : IDisposable
         {
             connectionInfo.LastActivity = DateTime.UtcNow;
             
-            if (isClientToServer)
-            {
-                // 客户端到服务器的数据，转发给目标服务器
-                if (connectionInfo.TargetStream != null)
-                {
-                    await connectionInfo.TargetStream.WriteAsync(data, 0, data.Length);
-                    await connectionInfo.TargetStream.FlushAsync();
-                    
-                    ProxyDataTransferred?.Invoke(this, (connectionId, data.Length));
-                    
-                    // 更新映射中的活动时间和字节数
-                    _connectionMapping.UpdateActivity(connectionId);
-                    _connectionMapping.UpdateBytesTransferred(connectionId, data.Length);
-                }
-            }
-            else
-            {
-                // 服务器到客户端的数据，转发给客户端（通过P2P连接）
-                var dataPacket = new ProxyDataPacket(connectionId, data, false);
-                
-                // 通过映射找到对应的用户ID
-                var userId = _connectionMapping.GetUserId(connectionId);
-                if (!string.IsNullOrEmpty(userId))
-                {
-                    try
-                    {
-                        await _client.SendPeerPacketAsync(userId, dataPacket);
-                        
-                        // 更新映射中的活动时间和字节数
-                        _connectionMapping.UpdateActivity(connectionId);
-                        _connectionMapping.UpdateBytesTransferred(connectionId, data.Length);
-                    }
-                    catch (Exception ex)
-                    {
-                        ConsoleWriter.WriteLine($"[代理] 发送数据到 {userId} 失败: {ex.Message}");
-                    }
-                }
-                else
-                {
-                    ConsoleWriter.WriteLine($"[代理] 未找到连接 {connectionId} 对应的用户ID");
-                }
-                
-                ProxyDataTransferred?.Invoke(this, (connectionId, data.Length));
-            }
+            // peer->目标服务器方向：入队，由专用线程写入
+            connectionInfo.PeerToTargetQueue.Enqueue(packet);
+            
+            // 统计
+            ProxyDataTransferred?.Invoke(this, (connectionId, packet.Data.Length));
+            _connectionMapping.UpdateActivity(connectionId);
+            _connectionMapping.UpdateBytesTransferred(connectionId, packet.Data.Length);
         }
         catch (Exception ex)
         {
@@ -239,6 +210,12 @@ public class ProxyManager : IDisposable
         
         try
         {
+            // 关闭peer->目标服务器写入线程
+            connectionInfo.PeerToTargetCts.Cancel();
+            if (connectionInfo.PeerToTargetTask != null)
+            {
+                try { await connectionInfo.PeerToTargetTask; } catch { }
+            }
             // 关闭网络连接
             connectionInfo.TargetStream?.Close();
             connectionInfo.TargetClient?.Close();
@@ -257,61 +234,109 @@ public class ProxyManager : IDisposable
     /// 从目标服务器转发数据到客户端
     /// </summary>
     /// <param name="connectionInfo">连接信息</param>
-    private async Task ForwardDataFromTargetAsync(ProxyConnectionInfo connectionInfo)
+    private void ForwardDataFromTargetSync(ProxyConnectionInfo connectionInfo)
     {
-        try
+        var buffer = new byte[65536];
+        int readCount = 0;
+        while (connectionInfo.IsConnected && !_disposed)
         {
-            var buffer = new byte[65536]; // 增加到64KB以支持更大的数据包
-            
-            while (connectionInfo.IsConnected && !_disposed)
+            if (connectionInfo.TargetStream == null) break;
+            int bytesRead = 0;
+            try
             {
-                if (connectionInfo.TargetStream == null) break;
-                
-                var bytesRead = await connectionInfo.TargetStream.ReadAsync(buffer, 0, buffer.Length);
-                if (bytesRead == 0)
+                bytesRead = connectionInfo.TargetStream.Read(buffer, 0, buffer.Length);
+            }
+            catch (Exception ex)
+            {
+                ConsoleWriter.WriteLine($"[代理] 目标服务器流读取异常 Conn={connectionInfo.ConnectionId} ex={ex.Message}");
+                break;
+            }
+            if (bytesRead == 0)
+            {
+                ConsoleWriter.WriteLine($"[代理] 目标服务器流断开 Conn={connectionInfo.ConnectionId} readCount={readCount}");
+                CloseProxyConnectionSync(connectionInfo.ConnectionId, "目标服务器流断开");
+                break;
+            }
+            readCount++;
+            ConsoleWriter.WriteLine($"[代理] 目标->P2P 读取到包 Conn={connectionInfo.ConnectionId} Size={bytesRead} readCount={readCount}");
+            // 立即向peer发包（同步）
+            var userId = _connectionMapping.GetUserId(connectionInfo.ConnectionId);
+            if (!string.IsNullOrEmpty(userId))
+            {
+                var seq = ++connectionInfo.SequenceIdCounter;
+                var packet = new ProxyDataPacket(connectionInfo.ConnectionId, buffer.Take(bytesRead).ToArray(), false, seq);
+                ConsoleWriter.WriteLine($"[代理] 目标->P2P 发送包 Conn={connectionInfo.ConnectionId} Seq={seq} Size={bytesRead}");
+                try
                 {
-                    break; // 连接已关闭
+                    _client.PeerConnectionManager.SendPacketAsync(userId, packet);
                 }
-                
-                // 转发数据到客户端 - 只使用实际读取的字节数
-                var data = new byte[bytesRead];
-                Array.Copy(buffer, 0, data, 0, bytesRead);
-                
-                var dataPacket = new ProxyDataPacket(connectionInfo.ConnectionId, data, false);
-                
-                // 通过映射找到对应的用户ID
-                var userId = _connectionMapping.GetUserId(connectionInfo.ConnectionId);
-                if (!string.IsNullOrEmpty(userId))
+                catch (Exception ex)
                 {
-                    // 再次检查连接是否仍然存在和有效
-                    if (!_connections.ContainsKey(connectionInfo.ConnectionId) || !connectionInfo.IsConnected)
-                    {
-                        break;
-                    }
-                    
-                    await _client.SendPeerPacketAsync(userId, dataPacket);
-                    
-                    // 更新映射中的活动时间和字节数
-                    _connectionMapping.UpdateActivity(connectionInfo.ConnectionId);
-                    _connectionMapping.UpdateBytesTransferred(connectionInfo.ConnectionId, bytesRead);
+                    ConsoleWriter.WriteLine($"[代理] 目标->P2P 发送包异常 Conn={connectionInfo.ConnectionId} ex={ex.Message}");
                 }
-                else
-                {
-                    ConsoleWriter.WriteLine($"[代理] 未找到连接 {connectionInfo.ConnectionId} 对应的用户ID");
-                }
-                
-                connectionInfo.LastActivity = DateTime.UtcNow;
-                ProxyDataTransferred?.Invoke(this, (connectionInfo.ConnectionId, bytesRead));
             }
         }
-        catch (Exception ex)
+    }
+
+    // 同步PeerToTargetWriter
+    private void PeerToTargetWriterSync(ProxyConnectionInfo connectionInfo)
+    {
+        long lastSeq = 0;
+        var buffer = new SortedDictionary<long, (byte[] Data, bool IsClientToServer, long Seq)>();
+        const int MAX_BUFFER_SIZE = 10000;
+        while (!connectionInfo.PeerToTargetCts.IsCancellationRequested && connectionInfo.IsConnected)
         {
-            ConsoleWriter.WriteLine($"[代理] 从目标服务器转发数据时出错: {connectionInfo.ConnectionId}, 错误: {ex.Message}");
+            if (connectionInfo.PeerToTargetQueue.TryDequeue(out var packet))
+            {
+                long seq = packet.SequenceId;
+                buffer[seq] = (packet.Data, packet.IsClientToServer, seq);
+                ConsoleWriter.WriteLine($"[P2P] 入队包 Seq={seq} Conn={connectionInfo.ConnectionId}");
+                if (buffer.Count > MAX_BUFFER_SIZE)
+                {
+                    ConsoleWriter.WriteLine($"[P2P] buffer溢出，主动断开连接: {connectionInfo.ConnectionId}");
+                    CloseProxyConnectionSync(connectionInfo.ConnectionId, "乱序缓存溢出");
+                    return;
+                }
+            }
+            // 顺序写入
+            while (buffer.TryGetValue(lastSeq + 1, out var next))
+            {
+                buffer.Remove(lastSeq + 1);
+                if (connectionInfo.TargetStream != null)
+                {
+                    connectionInfo.WriteLock.Wait();
+                    try
+                    {
+                        connectionInfo.TargetStream.Write(next.Data, 0, next.Data.Length);
+                        connectionInfo.TargetStream.Flush();
+                        ConsoleWriter.WriteLine($"[P2P] Peer->Target 写入包 Conn={connectionInfo.ConnectionId} Seq={lastSeq + 1} Size={next.Data.Length}");
+                    }
+                    finally
+                    {
+                        connectionInfo.WriteLock.Release();
+                    }
+                }
+                lastSeq++;
+            }
+            Thread.Sleep(1);
         }
-        finally
+    }
+
+    // 同步关闭连接
+    private void CloseProxyConnectionSync(string connectionId, string reason)
+    {
+        if (_connections.TryGetValue(connectionId, out var connectionInfo))
         {
-            ConsoleWriter.WriteLine($"[代理] 目标服务器连接已断开，准备关闭代理连接: {connectionInfo.ConnectionId}");
-            await CloseProxyConnectionAsync(connectionInfo.ConnectionId, "目标服务器连接断开");
+            try
+            {
+                connectionInfo.PeerToTargetCts.Cancel();
+                connectionInfo.TargetStream?.Close();
+                connectionInfo.TargetClient?.Close();
+            }
+            catch { }
+            _connections.Remove(connectionId);
+            _connectionMapping.RemoveMapping(connectionId);
+            ConsoleWriter.WriteLine($"[代理] 关闭连接 Conn={connectionId} 原因={reason}");
         }
     }
 
@@ -461,5 +486,12 @@ public class ProxyManager : IDisposable
         _connectionMapping?.Dispose();
         
         ConsoleWriter.WriteLine("[代理] 代理管理器已关闭");
+    }
+
+    // 启动同步转发线程
+    public void StartSyncForwarding(ProxyConnectionInfo connectionInfo)
+    {
+        new Thread(() => ForwardDataFromTargetSync(connectionInfo)) { IsBackground = true }.Start();
+        new Thread(() => PeerToTargetWriterSync(connectionInfo)) { IsBackground = true }.Start();
     }
 } 

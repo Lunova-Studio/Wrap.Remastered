@@ -3,7 +3,6 @@ using System.Net;
 using Wrap.Remastered.Client;
 using Wrap.Remastered.Network.Protocol;
 using Wrap.Remastered.Network.Protocol.ClientBound;
-using Wrap.Remastered.Network.Protocol.PeerBound;
 using Wrap.Remastered.Network.Protocol.ServerBound;
 using Wrap.Remastered.Schemas;
 
