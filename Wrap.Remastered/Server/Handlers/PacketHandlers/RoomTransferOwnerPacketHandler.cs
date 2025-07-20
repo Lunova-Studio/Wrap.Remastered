@@ -16,25 +16,13 @@ public class RoomTransferOwnerPacketHandler : RoomPacketHandler
 
     public override async Task OnHandleAsync(IChannel channel, UnsolvedPacket packet)
     {
-        var req = RoomTransferOwnerPacket.Serializer.Deserialize(packet.Data) as RoomTransferOwnerPacket;
-        if (req == null) return;
-        var room = RoomManager.GetRoom(req.RoomId);
-        if (room == null) return;
+        // 房主转移功能已取消
         var ownerConn = Server.GetConnectionManager().GetAllUserConnections().FirstOrDefault(c => c.Channel == channel);
-        if (ownerConn == null || room.Owner.UserId != ownerConn.UserInfo.UserId) return;
-        var newOwner = room.Users.FirstOrDefault(u => u.UserId == req.NewOwnerUserId);
-        if (newOwner == null) return;
-        room.Owner = newOwner;
-        var ownerChangedPacket = new RoomOwnerChangedPacket(room.Id, newOwner.UserId);
-        foreach (var u in room.Users)
+        if (ownerConn != null)
         {
-            await Server.GetConnectionManager().SendPacketToUserAsync(u.UserId, ownerChangedPacket);
-        }
-        // 同步最新房间信息
-        var infoPacket = new RoomInfoPacket(room);
-        foreach (var u in room.Users)
-        {
-            await Server.GetConnectionManager().SendPacketToUserAsync(u.UserId, infoPacket);
+            // 发送拒绝通知
+            var disconnectPacket = new DisconnectPacket("房主转移功能已取消");
+            await Server.GetConnectionManager().SendPacketToUserAsync(ownerConn.UserInfo.UserId, disconnectPacket);
         }
     }
 } 

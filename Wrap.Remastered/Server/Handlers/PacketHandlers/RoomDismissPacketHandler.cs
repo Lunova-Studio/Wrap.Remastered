@@ -21,8 +21,8 @@ public class RoomDismissPacketHandler : RoomPacketHandler
         var room = RoomManager.GetRoom(req.RoomId);
         if (room == null) return;
         var ownerConn = Server.GetConnectionManager().GetAllUserConnections().FirstOrDefault(c => c.Channel == channel);
-        if (ownerConn == null || room.Owner.UserId != ownerConn.UserInfo.UserId) return;
-        var userIds = room.Users.Select(u => u.UserId).ToList();
+        if (ownerConn == null || room.Owner.UserId != ownerConn.UserInfo!.UserId) return;
+        var userIds = room.Users.Select(u => u.Key).ToList();
         RoomManager.RemoveRoom(room.Id);
         var dismissedPacket = new RoomDismissedPacket(room.Id);
         foreach (var uid in userIds)

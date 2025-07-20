@@ -1,5 +1,6 @@
 ﻿using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Server.Services;
+using Wrap.Remastered.Server.Configuration;
 
 namespace Wrap.Remastered.Server;
 
@@ -7,8 +8,17 @@ class Program
 {
     static async Task Main(string[] args)
     {
+        // 创建服务器配置，启用IPv4专用模式
+        var config = new ServerConfiguration
+        {
+            Port = 10270,
+            BossThreads = 1,
+            WorkerThreads = 4,
+            MaxConnections = 1000,
+            IPv4Only = true
+        };
 
-        IWrapServer server = new WrapServer(port: 10270, bossThreads: 1, workerThreads: 4, maxConnections: 1000);
+        IWrapServer server = new WrapServer(config);
         LoggingService loggingService = server.GetLoggingService();
 
         try

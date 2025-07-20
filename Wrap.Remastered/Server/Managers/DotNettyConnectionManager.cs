@@ -206,6 +206,17 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
         return await connection.SendDataAsync(data);
     }
 
+    public async Task<bool> SendPacketToUserAsync(string userId, IClientBoundPacket packet)
+    {
+        CheckDisposed();
+
+        var connection = GetUserConnection(userId);
+        if (connection == null || !connection.IsActive)
+            return false;
+
+        return await connection.SendPacketAsync(packet);
+    }
+
     /// <summary>
     /// 发送数据给通道
     /// </summary>
@@ -393,18 +404,6 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
             ActiveConnections = activeConnections,
             InactiveConnections = inactiveConnections
         };
-    }
-
-    /// <summary>
-    /// 发送IClientBoundPacket给指定用户
-    /// </summary>
-    public async Task<bool> SendPacketToUserAsync(string userId, IClientBoundPacket packet)
-    {
-        CheckDisposed();
-        var connection = GetUserConnection(userId);
-        if (connection == null || !connection.IsActive)
-            return false;
-        return await connection.SendPacketAsync(packet);
     }
 
     /// <summary>

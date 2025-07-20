@@ -35,8 +35,11 @@ public class RoomJoinApprovePacketHandler : RoomPacketHandler
             var infoPacket = new RoomInfoPacket(room);
             foreach (var u in room.Users)
             {
-                await Server.GetConnectionManager().SendPacketToUserAsync(u.UserId, infoPacket);
+                await Server.GetConnectionManager().SendPacketToUserAsync(u.Value.UserId, infoPacket);
             }
+            
+            // 房主会在收到房间信息更新后自动发起P2P连接
+            // 这里不需要手动发起，避免重复连接
         }
     }
 } 

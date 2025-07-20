@@ -5,9 +5,11 @@ using DotNetty.Transport.Bootstrapping;
 using DotNetty.Transport.Channels;
 using DotNetty.Transport.Channels.Sockets;
 using System.Net;
+using System.Net.Sockets;
 using Wrap.Remastered.Commands;
 using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol.ClientBound;
+using Wrap.Remastered.Server.Configuration;
 using Wrap.Remastered.Server.Events;
 using Wrap.Remastered.Server.Handlers;
 using Wrap.Remastered.Server.Managers;
@@ -17,10 +19,8 @@ namespace Wrap.Remastered.Server;
 
 public class WrapServer : IWrapServer, IDisposable
 {
-    private readonly int _port;
-    private readonly int _bossThreads;
-    private readonly int _workerThreads;
-    private readonly int _maxConnections;
+    private readonly ServerConfiguration _configuration;
+    public ServerConfiguration Configuration => _configuration;
 
     private IEventLoopGroup? _bossGroup;
     private IEventLoopGroup? _workerGroup;
@@ -30,6 +30,7 @@ public class WrapServer : IWrapServer, IDisposable
     private CommandManager _commandManager;
     private LoggingService _loggingService;
     private RoomManager _roomManager = new RoomManager();
+    private PeerManager _peerManager = new PeerManager();
 
 
     private CancellationTokenSource? _statisticsCancellationTokenSource;
@@ -40,8 +41,8 @@ public class WrapServer : IWrapServer, IDisposable
 
     public bool Disposed => _disposed;
     public bool IsRunning => _isRunning;
-    public int Port => _port;
-    public int MaxConnections => _maxConnections;
+    public int Port => _configuration.Port;
+    public int MaxConnections => _configuration.MaxConnections;
     public int CurrentConnections => _connectionManager?.CurrentConnections ?? 0;
     public int CurrentUserConnections => _connectionManager?.CurrentUserConnections ?? 0;
 
@@ -51,21 +52,27 @@ public class WrapServer : IWrapServer, IDisposable
     public event EventHandler<ClientDisconnectedEventArgs>? ClientDisconnected;
     public event EventHandler<DataReceivedEventArgs>? DataReceived;
 
+    public WrapServer(ServerConfiguration? configuration = null)
+    {
+        _configuration = configuration ?? ServerConfiguration.CreateDefault();
+        _configuration.Validate();
+
+        _commandManager = new CommandManager();
+        _loggingService = new LoggingService(this);
+
+        _loggingService.InitializeServerCommands();
+    }
+
     public WrapServer(int port = 10270, int bossThreads = 1, int workerThreads = 4, int maxConnections = 1000)
     {
-        if (port <= 0 || port > 65535)
-            throw new ArgumentOutOfRangeException(nameof(port), "端口号必须在1-65535之间");
-        if (bossThreads <= 0)
-            throw new ArgumentOutOfRangeException(nameof(bossThreads), "Boss线程数必须大于0");
-        if (workerThreads <= 0)
-            throw new ArgumentOutOfRangeException(nameof(workerThreads), "Worker线程数必须大于0");
-        if (maxConnections <= 0)
-            throw new ArgumentOutOfRangeException(nameof(maxConnections), "最大连接数必须大于0");
-
-        _port = port;
-        _bossThreads = bossThreads;
-        _workerThreads = workerThreads;
-        _maxConnections = maxConnections;
+        _configuration = new ServerConfiguration
+        {
+            Port = port,
+            BossThreads = bossThreads,
+            WorkerThreads = workerThreads,
+            MaxConnections = maxConnections
+        };
+        _configuration.Validate();
 
         _commandManager = new CommandManager();
         _loggingService = new LoggingService(this);
@@ -84,11 +91,11 @@ public class WrapServer : IWrapServer, IDisposable
 
         try
         {
-            Console.WriteLine($"正在启动服务器，端口: {_port}");
+            Console.WriteLine($"正在启动服务器，端口: {_configuration.Port}");
 
             // 创建事件循环组
-            _bossGroup = new MultithreadEventLoopGroup(_bossThreads);
-            _workerGroup = new MultithreadEventLoopGroup(_workerThreads);
+            _bossGroup = new MultithreadEventLoopGroup(_configuration.BossThreads);
+            _workerGroup = new MultithreadEventLoopGroup(_configuration.WorkerThreads);
 
             // 创建连接管理器
             _connectionManager = new DotNettyConnectionManager(this);
@@ -100,9 +107,12 @@ public class WrapServer : IWrapServer, IDisposable
             // 创建服务器引导程序
             var bootstrap = new ServerBootstrap();
             bootstrap.Group(_bossGroup, _workerGroup)
-                   .Channel<TcpServerSocketChannel>()
+                   .ChannelFactory(() => new TcpServerSocketChannel(AddressFamily.InterNetwork))
                    .Option(ChannelOption.SoBacklog, 128)
                    .Option(ChannelOption.SoReuseaddr, true)
+                   .Option(ChannelOption.SoReuseport, true)
+                   .Option(ChannelOption.SoKeepalive, true)
+                   .Option(ChannelOption.TcpNodelay, true)
                    .ChildOption(ChannelOption.SoKeepalive, true)
                    .ChildOption(ChannelOption.TcpNodelay, true)
                    .Handler(new LoggingHandler("Boss"))
@@ -116,21 +126,38 @@ public class WrapServer : IWrapServer, IDisposable
                        pipeline.AddLast(new ServerHandler(this, _workerGroup));
                    }));
 
-            var endpoint = new IPEndPoint(IPAddress.Any, _port);
+            // 只绑定IPv4地址，拒绝IPv6连接
+            var endpoint = new IPEndPoint(IPAddress.Parse("0.0.0.0"), _configuration.Port);
+            Console.WriteLine($"服务器绑定到IPv4地址: {endpoint}");
             _serverChannel = await bootstrap.BindAsync(endpoint);
             _isRunning = true;
 
-            Console.WriteLine($"服务器启动成功，监听端口: {_port}");
-            Console.WriteLine($"最大连接数: {_maxConnections}");
-            Console.WriteLine($"Boss线程数: {_bossThreads}");
-            Console.WriteLine($"Worker线程数: {_workerThreads}");
+            Console.WriteLine($"服务器启动成功，监听端口: {_configuration.Port}");
+            Console.WriteLine($"最大连接数: {_configuration.MaxConnections}");
+            Console.WriteLine($"Boss线程数: {_configuration.BossThreads}");
+            Console.WriteLine($"Worker线程数: {_configuration.WorkerThreads}");
+            Console.WriteLine($"IPv4专用模式: {(_configuration.IPv4Only ? "启用" : "禁用")}");
+            Console.WriteLine($"实际绑定地址: {_serverChannel.LocalAddress}");
 
-            ServerStarted?.Invoke(this, new ServerStartedEventArgs(_port));
+            // 验证绑定地址是否为IPv4
+            if (_serverChannel.LocalAddress is IPEndPoint localEndPoint)
+            {
+                if (localEndPoint.AddressFamily != AddressFamily.InterNetwork)
+                {
+                    Console.WriteLine($"警告: 服务器绑定到了非IPv4地址: {localEndPoint.AddressFamily}");
+                }
+                else
+                {
+                    Console.WriteLine($"✓ 服务器成功绑定到IPv4地址: {localEndPoint}");
+                }
+            }
+
+            ServerStarted?.Invoke(this, new ServerStartedEventArgs(_configuration.Port));
 
             // 启动统计信息输出任务
             _statisticsCancellationTokenSource = new CancellationTokenSource();
             _ = OutputStatisticsAsync();
-            
+
             // 启动KeepAlive任务
             _keepAliveCancellationTokenSource = new CancellationTokenSource();
             _ = OutputKeepAliveAsync();
@@ -305,6 +332,10 @@ public class WrapServer : IWrapServer, IDisposable
         if (!string.IsNullOrEmpty(e.Connection.UserId))
         {
             var userId = e.Connection.UserId;
+
+            // 从PeerManager移除用户
+            _peerManager.RemoveUserConnection(userId);
+
             var roomId = _roomManager.GetUserRoomId(userId);
             if (roomId.HasValue)
             {
@@ -358,14 +389,14 @@ public class WrapServer : IWrapServer, IDisposable
                 {
                     var keepAliveValue = random.Next();
                     var keepAlivePacket = new KeepAlivePacket(keepAliveValue);
-                    
+
                     // 为每个连接设置期望的响应值
                     var connections = _connectionManager.GetAllConnections().ToList();
                     foreach (var connection in connections)
                     {
                         connection.SetExpectedKeepAliveValue(keepAliveValue);
                     }
-                    
+
                     await _connectionManager.BroadcastToUsersAsync(keepAlivePacket);
                 }
             }
@@ -442,6 +473,11 @@ public class WrapServer : IWrapServer, IDisposable
     public RoomManager GetRoomManager()
     {
         return _roomManager;
+    }
+
+    public PeerManager GetPeerManager()
+    {
+        return _peerManager;
     }
 }
 

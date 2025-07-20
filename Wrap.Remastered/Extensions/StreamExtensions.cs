@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -132,5 +133,39 @@ public static class StreamExtensions
     public static void WriteUInt8(this Stream stream, byte value)
     {
         stream.WriteByte(value);
+    }
+    
+    // 别名方法，为了兼容性
+    public static long ReadLong(this Stream stream) => stream.ReadInt64();
+    public static void WriteLong(this Stream stream, long value) => stream.WriteInt64(value);
+    
+    // 字节数组读写方法
+    public static byte[] ReadBytes(this Stream stream, int count)
+    {
+        byte[] buffer = new byte[count];
+        stream.Read(buffer);
+        return buffer;
+    }
+    
+    public static void WriteBytes(this Stream stream, byte[] value)
+    {
+        stream.Write(value);
+    }
+    
+    public static int ReadInt(this Stream stream) => stream.ReadInt32();
+    public static void WriteInt(this Stream stream, int value) => stream.WriteInt32(value);
+    public static void WriteBool(this Stream stream, bool value)
+    {
+        if (value)
+            stream.WriteByte((byte)1);
+
+        else
+            stream.WriteByte((byte)0);
+    }
+    public static bool ReadBool(this Stream stream)
+    {
+        byte next = (byte)stream.ReadByte();
+
+        return (next == 1);
     }
 }

@@ -1,5 +1,7 @@
 using DotNetty.Buffers;
 using DotNetty.Transport.Channels;
+using System.Net;
+using System.Net.Sockets;
 using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol;
 using Wrap.Remastered.Network.Protocol.ServerBound;
@@ -38,6 +40,20 @@ public class ServerHandler : ChannelHandlerAdapter
     {
         var channel = context.Channel;
         var remoteAddress = channel.RemoteAddress;
+
+        // 验证是否为IPv4连接（如果配置启用）
+        if (_server is WrapServer wrapServer && wrapServer.Configuration.IPv4Only)
+        {
+            if (remoteAddress is IPEndPoint remoteEndPoint)
+            {
+                if (remoteEndPoint.AddressFamily != AddressFamily.InterNetwork)
+                {
+                    _server.GetLoggingService().LogWarning("Connection", "拒绝IPv6连接: {0}", remoteAddress);
+                    _ = context.CloseAsync();
+                    return;
+                }
+            }
+        }
 
         _server.GetLoggingService().LogConnection("客户端连接: {0}", remoteAddress);
 
@@ -219,7 +235,10 @@ public class PacketHandlerFactory : IPacketHandlerFactory
             { (int)ServerBoundPacketType.RoomTransferOwnerPacket, new RoomTransferOwnerPacketHandler(server) },
             { (int)ServerBoundPacketType.RoomDismissPacket, new RoomDismissPacketHandler(server) },
             { (int)ServerBoundPacketType.RoomChatPacket, new RoomChatPacketHandler(server) },
-            { (int)ServerBoundPacketType.KeepAliveResponsePacket, new KeepAliveResponsePacketHandler(server) }
+            { (int)ServerBoundPacketType.KeepAliveResponsePacket, new KeepAliveResponsePacketHandler(server) },
+            { (int)ServerBoundPacketType.PeerConnectRequestPacket, new PeerConnectRequestPacketHandler(server) },
+            { (int)ServerBoundPacketType.PeerConnectAcceptPacket, new PeerConnectAcceptPacketHandler(server) },
+            { (int)ServerBoundPacketType.PeerConnectRejectPacket, new PeerConnectRejectPacketHandler(server) }
         };
     }
 
@@ -295,4 +314,6 @@ public interface IConnectionManager
     Task<bool> SendPacketToUserAsync(string userId, IClientBoundPacket packet);
 
     ChannelConnection? GetChannelConnection(IChannel channel);
+
+    ChannelConnection? GetUserConnection(string userId);
 }

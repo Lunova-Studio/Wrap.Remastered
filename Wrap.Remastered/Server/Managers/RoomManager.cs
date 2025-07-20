@@ -11,7 +11,8 @@ public class Room
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public UserInfo Owner { get; set; } = null!;
-    public List<UserInfo> Users { get; set; } = new();
+    public string OwnerUserId => Owner.UserId;
+    public Dictionary<string, UserInfo> Users { get; set; } = new();
     public int MaxUsers { get; set; } = 10;
 }
 
@@ -33,7 +34,7 @@ public class RoomManager
             Owner = owner,
             MaxUsers = maxUsers
         };
-        room.Users.Add(owner);
+        room.Users[owner.UserId] = owner;
         _rooms[room.Id] = room;
         _userRoomMap[owner.UserId] = room.Id;
         return room;
@@ -47,7 +48,7 @@ public class RoomManager
         {
             foreach (var user in room.Users)
             {
-                _userRoomMap.TryRemove(user.UserId, out _);
+                _userRoomMap.TryRemove(user.Key, out _);
             }
             return true;
         }
@@ -60,44 +61,34 @@ public class RoomManager
             return false;
         if (_rooms.TryGetValue(roomId, out var room))
         {
-            if (room.Users.Count < room.MaxUsers && !room.Users.Any(u => u.UserId == user.UserId))
+            if (room.Users.Count < room.MaxUsers && !room.Users.ContainsKey(user.UserId))
             {
-                room.Users.Add(user);
+                room.Users[user.UserId] = user;
                 _userRoomMap[user.UserId] = roomId;
                 return true;
             }
         }
         return false;
     }
-    public bool RemoveUserFromRoom(int roomId, string userId, Action<Room, string>? onOwnerChanged = null, Action<int, List<string>>? onRoomDismissed = null)
+    public bool RemoveUserFromRoom(int roomId, string userId, Action<int, List<string>>? onRoomDismissed = null)
     {
         if (_rooms.TryGetValue(roomId, out var room))
         {
-            var user = room.Users.FirstOrDefault(u => u.UserId == userId);
-            if (user != null)
+            if (room.Users.TryGetValue(userId, out var user))
             {
-                room.Users.Remove(user);
+                room.Users.Remove(userId);
                 _userRoomMap.TryRemove(userId, out _);
-                // 房主离开，自动转让
+                
+                // 房主离开，解散房间（取消房主转移功能）
                 if (room.Owner.UserId == userId)
                 {
-                    if (room.Users.Count > 0)
+                    var allUserIds = room.Users.Select(u => u.Value.UserId).ToList();
+                    _rooms.TryRemove(roomId, out _);
+                    foreach (var uid in allUserIds)
                     {
-                        var oldOwner = room.Owner.UserId;
-                        room.Owner = room.Users[0];
-                        onOwnerChanged?.Invoke(room, oldOwner);
+                        _userRoomMap.TryRemove(uid, out _);
                     }
-                    else
-                    {
-                        // 无人则解散房间
-                        var allUserIds = room.Users.Select(u => u.UserId).ToList();
-                        _rooms.TryRemove(roomId, out _);
-                        foreach (var uid in allUserIds)
-                        {
-                            _userRoomMap.TryRemove(uid, out _);
-                        }
-                        onRoomDismissed?.Invoke(roomId, allUserIds);
-                    }
+                    onRoomDismissed?.Invoke(roomId, allUserIds);
                 }
                 return true;
             }
@@ -108,5 +99,10 @@ public class RoomManager
     public int? GetUserRoomId(string userId)
     {
         return _userRoomMap.TryGetValue(userId, out var roomId) ? roomId : null;
+    }
+
+    public Room? GetUserRoom(string userId)
+    {
+        return _userRoomMap.TryGetValue(userId, out var roomId) ? GetRoom(roomId) : null;
     }
 } 

@@ -1,7 +1,10 @@
 ﻿using DotNetty.Buffers;
 using DotNetty.Transport.Channels;
+using System.Net;
+using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol;
 using Wrap.Remastered.Network.Protocol.ClientBound;
+using Wrap.Remastered.Network.Protocol.ServerBound;
 using Wrap.Remastered.Schemas;
 
 namespace Wrap.Remastered.Client;
@@ -100,6 +103,8 @@ public class ClientHandler : ChannelHandlerAdapter
                     // 处理登录成功响应
                     if (packet is LoginSucceedPacket loginSucceed)
                     {
+                        _client.RemoteIP = new IPEndPoint(new IPAddress(loginSucceed.IPAddress), loginSucceed.Port);
+                        _client.UPnPService?.AddPortMapping(_client.RemoteIP.Port, IUPnPService.SocketProtocol.TCP, ((IPEndPoint)_client._clientChannel!.LocalAddress).Port, "WrapClient");
                         var userInfo = new UserInfo
                         {
                             UserId = loginSucceed.UserId,
@@ -157,6 +162,36 @@ public class ClientHandler : ChannelHandlerAdapter
                     else if (packet is KeepAlivePacket keepAlivePacket)
                     {
                         _client.OnKeepAliveReceived(keepAlivePacket);
+                    }
+                    // 处理P2P连接请求通知
+                    else if (packet is PeerConnectRequestNoticePacket peerConnectRequestPacket)
+                    {
+                        _client.OnPeerConnectRequestReceived(peerConnectRequestPacket);
+                    }
+                    // 处理P2P连接接受通知
+                    else if (packet is PeerConnectAcceptNoticePacket peerConnectAcceptPacket)
+                    {
+                        _client.OnPeerConnectAcceptReceived(peerConnectAcceptPacket);
+                    }
+                    // 处理P2P连接拒绝通知
+                    else if (packet is PeerConnectRejectNoticePacket peerConnectRejectPacket)
+                    {
+                        _client.OnPeerConnectRejectReceived(peerConnectRejectPacket);
+                    }
+                    // 处理P2P IP信息包
+                    else if (packet is PeerIPInfoPacket peerIPInfoPacket)
+                    {
+                        _client.OnPeerIPInfoReceived(peerIPInfoPacket);
+                    }
+                    // 处理P2P连接成功包
+                    else if (packet is PeerConnectSuccessPacket peerConnectSuccessPacket)
+                    {
+                        _client.OnPeerConnectSuccessReceived(peerConnectSuccessPacket);
+                    }
+                    // 处理P2P连接失败包
+                    else if (packet is PeerConnectFailedNoticePacket peerConnectFailedPacket)
+                    {
+                        _client.OnPeerConnectFailedReceived(peerConnectFailedPacket);
                     }
                 }
             }

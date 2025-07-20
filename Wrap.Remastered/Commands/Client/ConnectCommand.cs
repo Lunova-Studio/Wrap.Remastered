@@ -59,9 +59,11 @@ public class ConnectCommand : CommandBase, ICommandTabCompleter
             
             // 注册登录成功事件
             _client.LoggedIn += OnLoggedIn;
-            
+
+#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
             _client.ConnectAsync(address, port).Wait();
-            
+#pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
+
             ConsoleWriter.WriteLineFormatted($"§a连接成功！正在发送登录请求...");
             
             // 发送登录请求
@@ -71,8 +73,10 @@ public class ConnectCommand : CommandBase, ICommandTabCompleter
                 Name = profile.Name,
                 DisplayName = profile.DisplayName
             };
-            
+
+#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
             _client.SendLoginPacketAsync(userInfo).Wait();
+#pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
         }
         catch (Exception ex)
         {

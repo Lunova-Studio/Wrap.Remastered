@@ -53,6 +53,11 @@ public class ServerConfiguration
     public int StatisticsInterval { get; set; } = 60;
 
     /// <summary>
+    /// 是否只接受IPv4连接
+    /// </summary>
+    public bool IPv4Only { get; set; } = true;
+
+    /// <summary>
     /// 验证配置
     /// </summary>
     public void Validate()

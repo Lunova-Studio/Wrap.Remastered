@@ -25,7 +25,7 @@ public class RoomInfoPacket : IClientBoundPacket
         RoomId = room.Id;
         RoomName = room.Name;
         Owner = room.Owner;
-        Users = new List<UserInfo>(room.Users);
+        Users = new List<UserInfo>(room.Users.Values);
         MaxUsers = room.MaxUsers;
     }
 

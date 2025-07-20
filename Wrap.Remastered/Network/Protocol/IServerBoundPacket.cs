@@ -19,7 +19,12 @@ public interface IServerBoundPacket : IPacket
         { ServerBoundPacketType.RoomTransferOwnerPacket, new RoomTransferOwnerPacketSerializer() },
         { ServerBoundPacketType.RoomDismissPacket, new RoomDismissPacketSerializer() },
         { ServerBoundPacketType.RoomChatPacket, new RoomChatPacketSerializer() },
-        { ServerBoundPacketType.KeepAliveResponsePacket, new KeepAliveResponsePacketSerializer() }
+        { ServerBoundPacketType.KeepAliveResponsePacket, new KeepAliveResponsePacketSerializer() },
+        { ServerBoundPacketType.PeerConnectRequestPacket, new PeerConnectRequestPacketSerializer() },
+        { ServerBoundPacketType.PeerConnectAcceptPacket, new PeerConnectAcceptPacketSerializer() },
+        { ServerBoundPacketType.PeerConnectRejectPacket, new PeerConnectRejectPacketSerializer() },
+        { ServerBoundPacketType.PeerConnectFailedPacket, new PeerConnectFailedPacketSerializer() },
+        { ServerBoundPacketType.PeerConnectSuccessPacket, new PeerConnectSuccessPacketSerializer() }
     };
 
     ServerBoundPacketType GetPacketType();

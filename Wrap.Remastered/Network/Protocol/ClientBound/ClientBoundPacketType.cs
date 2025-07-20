@@ -19,5 +19,10 @@ public enum ClientBoundPacketType
     RoomDismissedPacket,
     RoomInfoQueryResultPacket,
     RoomChatMessagePacket,
-    KeepAlivePacket
+    KeepAlivePacket,
+    PeerConnectRequestNoticePacket,
+    PeerConnectAcceptNoticePacket,
+    PeerConnectRejectNoticePacket,
+    PeerIPInfoPacket,
+    PeerConnectFailedNoticePacket
 }

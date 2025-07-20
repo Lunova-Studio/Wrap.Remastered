@@ -24,15 +24,6 @@ public class RoomLeavePacketHandler : RoomPacketHandler
         var room = RoomManager.GetRoom(req.RoomId);
         if (room == null) return;
         RoomManager.RemoveUserFromRoom(room.Id, userInfo.UserId,
-            async (changedRoom, oldOwnerId) =>
-            {
-                // 通知所有成员房主变更
-                var ownerChangedPacket = new RoomOwnerChangedPacket(changedRoom.Id, changedRoom.Owner.UserId);
-                foreach (var u in changedRoom.Users)
-                {
-                    await Server.GetConnectionManager().SendPacketToUserAsync(u.UserId, ownerChangedPacket);
-                }
-            },
             async (dismissedRoomId, userIds) =>
             {
                 // 通知所有成员房间解散
@@ -46,7 +37,7 @@ public class RoomLeavePacketHandler : RoomPacketHandler
         var infoPacket = new RoomInfoPacket(room);
         foreach (var u in room.Users)
         {
-            await Server.GetConnectionManager().SendPacketToUserAsync(u.UserId, infoPacket);
+            await Server.GetConnectionManager().SendPacketToUserAsync(u.Key, infoPacket);
         }
     }
 } 

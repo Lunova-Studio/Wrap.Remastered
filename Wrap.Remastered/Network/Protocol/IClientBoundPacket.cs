@@ -24,7 +24,12 @@ public interface IClientBoundPacket : IPacket
         { ClientBoundPacketType.RoomDismissedPacket, new RoomDismissedPacketSerializer() },
         { ClientBoundPacketType.RoomInfoQueryResultPacket, new RoomInfoQueryResultPacketSerializer() },
         { ClientBoundPacketType.RoomChatMessagePacket, new RoomChatMessagePacketSerializer() },
-        { ClientBoundPacketType.KeepAlivePacket, new KeepAlivePacketSerializer() }
+        { ClientBoundPacketType.KeepAlivePacket, new KeepAlivePacketSerializer() },
+        { ClientBoundPacketType.PeerConnectRequestNoticePacket, new PeerConnectRequestNoticePacketSerializer() },
+        { ClientBoundPacketType.PeerConnectAcceptNoticePacket, new PeerConnectAcceptNoticePacketSerializer() },
+        { ClientBoundPacketType.PeerConnectRejectNoticePacket, new PeerConnectRejectNoticePacketSerializer() },
+        { ClientBoundPacketType.PeerIPInfoPacket, new PeerIPInfoPacketSerializer() },
+        { ClientBoundPacketType.PeerConnectFailedNoticePacket, new PeerConnectFailedNoticePacketSerializer() }
     };
 
     ClientBoundPacketType GetPacketType();

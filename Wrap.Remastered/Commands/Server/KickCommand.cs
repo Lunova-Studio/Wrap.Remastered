@@ -70,7 +70,7 @@ public class KickCommand : CommandBase, ICommandTabCompleter
                 var room = roomMgr.GetRoom(roomId);
                 if (room != null)
                 {
-                    list.AddRange(room.Users.Select(u => u.UserId));
+                    list.AddRange(room.Users.Select(u => u.Value.UserId));
                 }
             }
         }

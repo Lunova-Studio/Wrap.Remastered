@@ -1,9 +1,12 @@
 using DotNetty.Transport.Channels;
+using System.Net;
+using Waher.Script.Constants;
 using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol;
 using Wrap.Remastered.Network.Protocol.ClientBound;
 using Wrap.Remastered.Network.Protocol.ServerBound;
 using Wrap.Remastered.Schemas;
+using Wrap.Remastered.Server.Managers;
 
 namespace Wrap.Remastered.Server.Handlers.PacketHandlers;
 
@@ -27,7 +30,7 @@ public class LoginPacketHandler : BasePacketHandler
             if (loginPacket == null)
             {
                 Server.GetLoggingService().LogError("Packet", "登录数据包反序列化失败", null, "通道: {0}", channel.RemoteAddress);
-                await SendLoginFailedResponse(channel, "INVALID_PACKET", "数据包格式错误");
+                await SendLoginFailedResponseAsync(channel, "INVALID_PACKET", "数据包格式错误");
                 return;
             }
 
@@ -50,19 +53,22 @@ public class LoginPacketHandler : BasePacketHandler
             Server.GetLoggingService().LogUser("用户登录成功: {0} (ID: {1})", serverUserInfo.DisplayName, serverUserInfo.UserId);
 
             // 发送登录成功响应
-            await SendLoginSucceedResponse(channel, serverUserInfo);
+            await SendLoginSucceedResponseAsync(channel, serverUserInfo);
+
+            // 添加到PeerManager
+            Server.GetPeerManager().AddUserConnection(userId, Server.GetConnectionManager().GetChannelConnection(channel)!);
         }
         catch (Exception ex)
         {
             Server.GetLoggingService().LogError("User", "处理登录请求时发生错误", ex);
-            await SendLoginFailedResponse(channel, "SERVER_ERROR", "服务器内部错误");
+            await SendLoginFailedResponseAsync(channel, "SERVER_ERROR", "服务器内部错误");
         }
     }
 
     /// <summary>
     /// 发送登录成功响应
     /// </summary>
-    private async Task SendLoginSucceedResponse(IChannel channel, UserInfo userInfo)
+    private async Task SendLoginSucceedResponseAsync(IChannel channel, UserInfo userInfo)
     {
         try
         {
@@ -71,10 +77,12 @@ public class LoginPacketHandler : BasePacketHandler
                 UserId = userInfo.UserId,
                 Name = userInfo.Name,
                 DisplayName = userInfo.DisplayName,
-                LoginTime = DateTime.UtcNow
+                LoginTime = DateTime.UtcNow,
+                IPAddress = ((IPEndPoint)channel.RemoteAddress).Address.GetAddressBytes(),
+                Port = ((IPEndPoint)channel.RemoteAddress).Port
             };
 
-            await SendPacketAsync(channel, loginSucceedPacket);
+            await Server.GetConnectionManager().GetChannelConnection(channel)!.SendPacketAsync(loginSucceedPacket);
             Server.GetLoggingService().LogUser("已发送登录成功响应给用户: {0}", userInfo.DisplayName);
         }
         catch (Exception ex)
@@ -86,7 +94,7 @@ public class LoginPacketHandler : BasePacketHandler
     /// <summary>
     /// 发送登录失败响应
     /// </summary>
-    private async Task SendLoginFailedResponse(IChannel channel, string errorCode, string errorMessage)
+    private async Task SendLoginFailedResponseAsync(IChannel channel, string errorCode, string errorMessage)
     {
         try
         {
@@ -97,7 +105,7 @@ public class LoginPacketHandler : BasePacketHandler
                 FailTime = DateTime.UtcNow
             };
 
-            await SendPacketAsync(channel, loginFailedPacket);
+            await Server.GetConnectionManager().GetChannelConnection(channel)!.SendPacketAsync(loginFailedPacket);
             Server.GetLoggingService().LogUser("已发送登录失败响应: {0} - {1}", errorCode, errorMessage);
         }
         catch (Exception ex)
@@ -109,7 +117,7 @@ public class LoginPacketHandler : BasePacketHandler
     /// <summary>
     /// 发送断开连接包（踢出/服务器关闭等）
     /// </summary>
-    public async Task SendDisconnectPacket(IChannel channel, string reason)
+    public async Task SendDisconnectPacketAsync(IChannel channel, string reason)
     {
         try
         {
@@ -118,24 +126,12 @@ public class LoginPacketHandler : BasePacketHandler
                 Reason = reason,
                 DisconnectTime = DateTime.UtcNow
             };
-            await SendPacketAsync(channel, disconnectPacket);
+            await Server.GetConnectionManager().GetChannelConnection(channel)!.SendPacketAsync(disconnectPacket);
             Server.GetLoggingService().LogUser("已发送断开连接包: {0}", reason);
         }
         catch (Exception ex)
         {
             Server.GetLoggingService().LogError("User", "发送断开连接包时发生错误", ex);
         }
-    }
-
-    private async Task SendPacketAsync(IChannel channel, IClientBoundPacket packet)
-    {
-        var serializer = packet.GetSerializer();
-        var data = serializer.Serialize(packet);
-        packet.OnSerialize(ref data);
-        var packetData = new byte[4 + data.Length];
-        BitConverter.GetBytes((int)packet.GetPacketType()).CopyTo(packetData, 0);
-        data.CopyTo(packetData, 4);
-        var buffer = DotNetty.Buffers.Unpooled.WrappedBuffer(packetData);
-        await channel.WriteAndFlushAsync(buffer);
     }
 }

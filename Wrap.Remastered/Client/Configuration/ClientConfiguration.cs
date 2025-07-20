@@ -48,6 +48,26 @@ public class ClientConfiguration
     public int HeartbeatInterval { get; set; } = 30;
 
     /// <summary>
+    /// P2P心跳间隔（秒）
+    /// </summary>
+    public int PeerHeartbeatInterval { get; set; } = 10;
+    
+    /// <summary>
+    /// 代理超时时间（秒）
+    /// </summary>
+    public int ProxyTimeout { get; set; } = 30;
+    
+    /// <summary>
+    /// 最大代理连接数
+    /// </summary>
+    public int MaxProxyConnections { get; set; } = 100;
+    
+    /// <summary>
+    /// 代理缓冲区大小
+    /// </summary>
+    public int ProxyBufferSize { get; set; } = 8192;
+
+    /// <summary>
     /// 是否启用日志
     /// </summary>
     public bool EnableLogging { get; set; } = true;

@@ -97,4 +97,10 @@ public interface IWrapServer : IDisposable
     LoggingService GetLoggingService();
 
     RoomManager GetRoomManager();
+    
+    /// <summary>
+    /// 获取P2P连接管理器
+    /// </summary>
+    /// <returns>P2P连接管理器</returns>
+    PeerManager GetPeerManager();
 }

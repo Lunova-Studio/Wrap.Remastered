@@ -21,18 +21,10 @@ public class RoomKickPacketHandler : RoomPacketHandler
         var room = RoomManager.GetRoom(req.RoomId);
         if (room == null) return;
         var ownerConn = Server.GetConnectionManager().GetAllUserConnections().FirstOrDefault(c => c.Channel == channel);
-        if (ownerConn == null || room.Owner.UserId != ownerConn.UserInfo.UserId) return;
-        var kickedUser = room.Users.FirstOrDefault(u => u.UserId == req.UserId);
+        if (ownerConn == null || room.Owner.UserId != ownerConn.UserInfo!.UserId) return;
+        var kickedUser = room.Users.FirstOrDefault(u => u.Key == req.UserId).Value;
         if (kickedUser == null) return;
         RoomManager.RemoveUserFromRoom(room.Id, req.UserId,
-            async (changedRoom, oldOwnerId) =>
-            {
-                var ownerChangedPacket = new RoomOwnerChangedPacket(changedRoom.Id, changedRoom.Owner.UserId);
-                foreach (var u in changedRoom.Users)
-                {
-                    await Server.GetConnectionManager().SendPacketToUserAsync(u.UserId, ownerChangedPacket);
-                }
-            },
             async (dismissedRoomId, userIds) =>
             {
                 var dismissedPacket = new RoomDismissedPacket(dismissedRoomId);
@@ -45,7 +37,7 @@ public class RoomKickPacketHandler : RoomPacketHandler
         var infoPacket = new RoomInfoPacket(room);
         foreach (var u in room.Users)
         {
-            await Server.GetConnectionManager().SendPacketToUserAsync(u.UserId, infoPacket);
+            await Server.GetConnectionManager().SendPacketToUserAsync(u.Key, infoPacket);
         }
     }
 } 

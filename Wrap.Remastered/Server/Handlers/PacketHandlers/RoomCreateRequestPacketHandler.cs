@@ -31,7 +31,7 @@ public class RoomCreateRequestPacketHandler : RoomPacketHandler
         var infoPacket = new RoomInfoPacket(room);
         foreach (var user in room.Users)
         {
-            await Server.GetConnectionManager().SendPacketToUserAsync(user.UserId, infoPacket);
+            await Server.GetConnectionManager().SendPacketToUserAsync(user.Key, infoPacket);
         }
     }
 

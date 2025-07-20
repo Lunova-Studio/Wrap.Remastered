@@ -20,5 +20,10 @@ public enum ServerBoundPacketType
     RoomTransferOwnerPacket,
     RoomDismissPacket,
     RoomChatPacket,
-    KeepAliveResponsePacket
+    KeepAliveResponsePacket,
+    PeerConnectRequestPacket,
+    PeerConnectAcceptPacket,
+    PeerConnectRejectPacket,
+    PeerConnectFailedPacket,
+    PeerConnectSuccessPacket
 }

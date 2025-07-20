@@ -9,6 +9,31 @@ public class UserProfile
 {
     public string Name { get; set; } = "";
     public string DisplayName { get; set; } = "";
+    
+    /// <summary>
+    /// P2P心跳间隔（秒）
+    /// </summary>
+    public int PeerHeartbeatInterval { get; set; } = 10;
+    
+    /// <summary>
+    /// 是否启用代理转发
+    /// </summary>
+    public bool EnableProxyForwarding { get; set; } = true;
+    
+    /// <summary>
+    /// 本地代理监听端口
+    /// </summary>
+    public int LocalProxyPort { get; set; } = 25565;
+    
+    /// <summary>
+    /// 转发目标地址
+    /// </summary>
+    public string ProxyTargetAddress { get; set; } = "127.0.0.1";
+    
+    /// <summary>
+    /// 转发目标端口
+    /// </summary>
+    public int ProxyTargetPort { get; set; } = 25565;
 
     private static string ProfilePath => Path.Combine(AppContext.BaseDirectory, "userprofile.json");
 

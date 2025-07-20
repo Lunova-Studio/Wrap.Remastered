@@ -26,11 +26,11 @@ public class RoomChatPacketHandler : RoomPacketHandler
         if (userInfo == null) return;
         var room = RoomManager.GetRoom(req.RoomId);
         if (room == null) return;
-        if (!room.Users.Any(u => u.UserId == userInfo.UserId)) return; // 只允许房间成员发言
+        if (!room.Users.Any(u => u.Key == userInfo.UserId)) return; // 只允许房间成员发言
         var msgPacket = new RoomChatMessagePacket(room.Id, userInfo.UserId, userInfo.DisplayName, req.Message, DateTime.UtcNow);
         foreach (var u in room.Users)
         {
-            await Server.GetConnectionManager().SendPacketToUserAsync(u.UserId, msgPacket);
+            await Server.GetConnectionManager().SendPacketToUserAsync(u.Key, msgPacket);
         }
     }
 } 

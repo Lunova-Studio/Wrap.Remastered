@@ -18,13 +18,17 @@ public class LoginSucceedPacket : IClientBoundPacket
     public string Name { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public DateTime LoginTime { get; set; } = DateTime.Now;
+    public byte[] IPAddress { get; set; } = new byte[4];
+    public int Port { get; set; }
 
-    public LoginSucceedPacket(string userId, string name, string displayName)
+    public LoginSucceedPacket(string userId, string name, string displayName, byte[] ipAddress, int port)
     {
         UserId = userId;
         Name = name;
         DisplayName = displayName;
         LoginTime = DateTime.Now;
+        IPAddress = ipAddress;
+        Port = port;
     }
 
     public LoginSucceedPacket(UserInfo userInfo)
@@ -75,6 +79,8 @@ public class LoginSucceedPacketSerializer : ISerializer<IPacket>
         packet.Name = stream.ReadString();
         packet.DisplayName = stream.ReadString();
         packet.LoginTime = DateTime.FromBinary(stream.ReadInt64());
+        packet.IPAddress = stream.ReadBytes(4);
+        packet.Port = stream.ReadInt32();
 
         return packet;
     }
@@ -89,6 +95,8 @@ public class LoginSucceedPacketSerializer : ISerializer<IPacket>
         stream.WriteString(loginSucceedPacket.Name);
         stream.WriteString(loginSucceedPacket.DisplayName);
         stream.WriteInt64(loginSucceedPacket.LoginTime.ToBinary());
+        stream.WriteBytes(loginSucceedPacket.IPAddress);
+        stream.WriteInt32(loginSucceedPacket.Port);
 
         return stream.ToArray();
     }
