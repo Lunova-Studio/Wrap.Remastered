@@ -33,6 +33,7 @@ public class WrapServer : IWrapServer, IDisposable
 
 
     private CancellationTokenSource? _statisticsCancellationTokenSource;
+    private CancellationTokenSource? _keepAliveCancellationTokenSource;
 
     private volatile bool _disposed = false;
     private volatile bool _isRunning = false;
@@ -128,7 +129,11 @@ public class WrapServer : IWrapServer, IDisposable
 
             // 启动统计信息输出任务
             _statisticsCancellationTokenSource = new CancellationTokenSource();
-            _ = Task.Run(OutputStatisticsAsync, _statisticsCancellationTokenSource.Token);
+            _ = OutputStatisticsAsync();
+            
+            // 启动KeepAlive任务
+            _keepAliveCancellationTokenSource = new CancellationTokenSource();
+            _ = OutputKeepAliveAsync();
         }
         catch (Exception ex)
         {
@@ -157,11 +162,21 @@ public class WrapServer : IWrapServer, IDisposable
 
             _isRunning = false;
 
-            // 取消统计任务
-            await _statisticsCancellationTokenSource?.CancelAsync();
+            // 停止KeepAlive任务
+            if (_keepAliveCancellationTokenSource != null)
+            {
+                await _keepAliveCancellationTokenSource.CancelAsync();
+                _keepAliveCancellationTokenSource.Dispose();
+                _keepAliveCancellationTokenSource = null;
+            }
 
-            // 等待一小段时间让统计任务正常退出
-            await Task.Delay(100);
+            // 停止统计信息输出任务
+            if (_statisticsCancellationTokenSource != null)
+            {
+                await _statisticsCancellationTokenSource.CancelAsync();
+                _statisticsCancellationTokenSource.Dispose();
+                _statisticsCancellationTokenSource = null;
+            }
 
             // 释放连接管理器
             _connectionManager?.Dispose();
@@ -323,6 +338,44 @@ public class WrapServer : IWrapServer, IDisposable
             catch (Exception ex)
             {
                 ConsoleWriter.WriteLine($"输出统计信息时发生错误: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 输出KeepAlive包
+    /// </summary>
+    private async Task OutputKeepAliveAsync()
+    {
+        var random = new Random();
+        while (!_keepAliveCancellationTokenSource!.Token.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(10000, _keepAliveCancellationTokenSource.Token); // 10秒发送一次
+
+                if (_connectionManager != null)
+                {
+                    var keepAliveValue = random.Next();
+                    var keepAlivePacket = new KeepAlivePacket(keepAliveValue);
+                    
+                    // 为每个连接设置期望的响应值
+                    var connections = _connectionManager.GetAllConnections().ToList();
+                    foreach (var connection in connections)
+                    {
+                        connection.SetExpectedKeepAliveValue(keepAliveValue);
+                    }
+                    
+                    await _connectionManager.BroadcastToUsersAsync(keepAlivePacket);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                ConsoleWriter.WriteLine($"发送KeepAlive包时发生错误: {ex.Message}");
             }
         }
     }

@@ -153,6 +153,11 @@ public class ClientHandler : ChannelHandlerAdapter
                     {
                         _client.OnUserInfoResultReceived(userInfoResultPacket);
                     }
+                    // 处理KeepAlive包
+                    else if (packet is KeepAlivePacket keepAlivePacket)
+                    {
+                        _client.OnKeepAliveReceived(keepAlivePacket);
+                    }
                 }
             }
         }

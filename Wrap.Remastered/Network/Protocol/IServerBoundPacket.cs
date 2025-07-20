@@ -18,7 +18,8 @@ public interface IServerBoundPacket : IPacket
         { ServerBoundPacketType.RoomJoinRejectPacket, new RoomJoinRejectPacketSerializer() },
         { ServerBoundPacketType.RoomTransferOwnerPacket, new RoomTransferOwnerPacketSerializer() },
         { ServerBoundPacketType.RoomDismissPacket, new RoomDismissPacketSerializer() },
-        { ServerBoundPacketType.RoomChatPacket, new RoomChatPacketSerializer() }
+        { ServerBoundPacketType.RoomChatPacket, new RoomChatPacketSerializer() },
+        { ServerBoundPacketType.KeepAliveResponsePacket, new KeepAliveResponsePacketSerializer() }
     };
 
     ServerBoundPacketType GetPacketType();

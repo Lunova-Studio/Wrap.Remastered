@@ -218,7 +218,8 @@ public class PacketHandlerFactory : IPacketHandlerFactory
             { (int)ServerBoundPacketType.RoomJoinRejectPacket, new RoomJoinRejectPacketHandler(server) },
             { (int)ServerBoundPacketType.RoomTransferOwnerPacket, new RoomTransferOwnerPacketHandler(server) },
             { (int)ServerBoundPacketType.RoomDismissPacket, new RoomDismissPacketHandler(server) },
-            { (int)ServerBoundPacketType.RoomChatPacket, new RoomChatPacketHandler(server) }
+            { (int)ServerBoundPacketType.RoomChatPacket, new RoomChatPacketHandler(server) },
+            { (int)ServerBoundPacketType.KeepAliveResponsePacket, new KeepAliveResponsePacketHandler(server) }
         };
     }
 
@@ -292,4 +293,6 @@ public interface IConnectionManager
     Task<int> BroadcastToUsersAsync(byte[] data, string? excludeUserId = null);
 
     Task<bool> SendPacketToUserAsync(string userId, IClientBoundPacket packet);
+
+    ChannelConnection? GetChannelConnection(IChannel channel);
 }

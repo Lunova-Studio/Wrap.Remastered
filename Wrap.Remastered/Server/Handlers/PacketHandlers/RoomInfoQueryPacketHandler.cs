@@ -23,7 +23,7 @@ public class RoomInfoQueryPacketHandler : RoomPacketHandler
         var requester = Server.GetConnectionManager().GetAllUserConnections().FirstOrDefault(c => c.Channel == channel)?.UserInfo;
         if (requester != null)
         {
-            Server.GetConnectionManager().SendPacketToUserAsync(requester.UserId, resultPacket).Wait();
+            await Server.GetConnectionManager().SendPacketToUserAsync(requester.UserId, resultPacket);
         }
     }
 } 

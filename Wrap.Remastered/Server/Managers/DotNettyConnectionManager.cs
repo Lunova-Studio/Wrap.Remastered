@@ -41,7 +41,8 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
         _userConnections = new ConcurrentDictionary<string, ChannelConnection>();
         
         // 启动定期清理任务
-        _cleanupTimer = new Timer(CleanupInactiveConnections, null, cleanupInterval, cleanupInterval);
+
+        _cleanupTimer = new Timer(async state => await CleanupInactiveConnectionsAsync(state), null, cleanupInterval, cleanupInterval);
     }
 
     /// <summary>
@@ -409,7 +410,7 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
     /// <summary>
     /// 清理非活跃连接
     /// </summary>
-    private void CleanupInactiveConnections(object? state)
+    private async Task CleanupInactiveConnectionsAsync(object? state)
     {
         try
         {
@@ -417,27 +418,32 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
             if (_disposed)
                 return;
 
+            var now = DateTime.UtcNow;
             var inactiveConnections = _connections.Values
-                .Where(conn => !conn.IsActive)
+                .Where(conn => !conn.IsActive || (now - conn.LastActivity).TotalSeconds > 15) // 15秒无活动则断开
                 .ToList();
 
             foreach (var connection in inactiveConnections)
             {
+                _server.GetLoggingService().LogConnection("清理非活跃连接: {0}", connection.RemoteAddress);
+                
+                // 先发送断开包告知原因
+                var disconnectPacket = new DisconnectPacket("连接超时，无活动");
+                await connection.SendPacketAsync(disconnectPacket);
+                
+                connection.Close();
                 _connections.TryRemove(connection.Channel, out _);
+                
+                // 如果连接有用户信息，也从用户连接字典中移除
                 if (!string.IsNullOrEmpty(connection.UserId))
                 {
                     _userConnections.TryRemove(connection.UserId, out _);
                 }
             }
-
-            if (inactiveConnections.Count > 0)
-            {
-                _server.GetLoggingService().LogConnection("清理了 {0} 个非活跃连接", inactiveConnections.Count);
-            }
         }
         catch (Exception ex)
         {
-            _server.GetLoggingService().LogError("Connection", "清理连接时发生错误", ex);
+            _server.GetLoggingService().LogError("Connection", "清理非活跃连接时发生错误", ex);
         }
     }
 
@@ -481,8 +487,10 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
 /// </summary>
 public class ChannelConnection
 {
+    private readonly IChannel _channel;
     private UserInfo? _userInfo;
     private DateTime _lastActivity;
+    private int? _expectedKeepAliveValue; // 期望的KeepAlive响应值
 
     /// <summary>
     /// 通道
@@ -500,7 +508,7 @@ public class ChannelConnection
     public DateTime LastActivity
     {
         get => _lastActivity;
-        private set => _lastActivity = value;
+        set => _lastActivity = value;
     }
 
     /// <summary>
@@ -524,14 +532,20 @@ public class ChannelConnection
     public string RemoteAddress => Channel.RemoteAddress?.ToString() ?? "Unknown";
 
     /// <summary>
+    /// 期望的KeepAlive响应值
+    /// </summary>
+    public int? ExpectedKeepAliveValue => _expectedKeepAliveValue;
+
+    /// <summary>
     /// 构造函数
     /// </summary>
     /// <param name="channel">通道</param>
     public ChannelConnection(IChannel channel)
     {
-        Channel = channel ?? throw new ArgumentNullException(nameof(channel));
+        _channel = channel ?? throw new ArgumentNullException(nameof(channel));
+        Channel = channel;
         ConnectedAt = DateTime.UtcNow;
-        LastActivity = DateTime.UtcNow;
+        _lastActivity = ConnectedAt;
     }
 
     /// <summary>
@@ -549,7 +563,32 @@ public class ChannelConnection
     /// </summary>
     public void UpdateActivity()
     {
-        LastActivity = DateTime.UtcNow;
+        _lastActivity = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// 设置期望的KeepAlive响应值
+    /// </summary>
+    /// <param name="value">期望的KeepAlive响应值</param>
+    public void SetExpectedKeepAliveValue(int value)
+    {
+        _expectedKeepAliveValue = value;
+    }
+
+    /// <summary>
+    /// 验证KeepAlive响应
+    /// </summary>
+    /// <param name="responseValue">接收到的KeepAlive响应值</param>
+    /// <returns>是否匹配</returns>
+    public bool ValidateKeepAliveResponse(int responseValue)
+    {
+        if (_expectedKeepAliveValue.HasValue && _expectedKeepAliveValue.Value == responseValue)
+        {
+            _expectedKeepAliveValue = null; // 清除期望值
+            UpdateActivity();
+            return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -592,7 +631,7 @@ public class ChannelConnection
 
             return true;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             return false;
         }

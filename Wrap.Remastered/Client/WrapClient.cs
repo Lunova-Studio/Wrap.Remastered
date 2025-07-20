@@ -42,6 +42,7 @@ public class WrapClient : IWrapClient, IDisposable
     public event EventHandler<RoomChatMessagePacket>? RoomChatMessageReceived;
     public event EventHandler<UserInfoResultPacket>? UserInfoResultReceived;
     public UserInfoResultPacket? LastUserInfoResult { get; private set; }
+    public event EventHandler<KeepAlivePacket>? KeepAliveReceived;
 
     public bool Disposed => _disposed;
     public bool IsConnected => _isConnected && _clientChannel?.Active == true;
@@ -163,7 +164,9 @@ public class WrapClient : IWrapClient, IDisposable
 
     public void Connect(string serverAddress, int port = 10270)
     {
+#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
         ConnectAsync(serverAddress, port).GetAwaiter().GetResult();
+#pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
     }
 
     public async Task DisconnectAsync()
@@ -197,7 +200,9 @@ public class WrapClient : IWrapClient, IDisposable
 
     public void Disconnect()
     {
+#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
         DisconnectAsync().GetAwaiter().GetResult();
+#pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
     }
 
     public async Task SendPacketAsync(IServerBoundPacket packet)
@@ -231,7 +236,7 @@ public class WrapClient : IWrapClient, IDisposable
                 await _clientChannel.WriteAndFlushAsync(buffer);
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             throw;
         }
@@ -239,7 +244,9 @@ public class WrapClient : IWrapClient, IDisposable
 
     public void SendPacket(IServerBoundPacket packet)
     {
+#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
         SendPacketAsync(packet).GetAwaiter().GetResult();
+#pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
     }
 
     /// <summary>
@@ -365,6 +372,12 @@ public class WrapClient : IWrapClient, IDisposable
         LastUserInfoResult = packet;
         UserInfoResultReceived?.Invoke(this, packet);
         ConsoleWriter.WriteLineFormatted($"§a用户信息: UserId={packet.UserInfo.UserId}, Name={packet.UserInfo.Name}, DisplayName={packet.UserInfo.DisplayName}");
+    }
+    internal void OnKeepAliveReceived(KeepAlivePacket packet)
+    {
+        KeepAliveReceived?.Invoke(this, packet);
+        // 立即回复相同的Value
+        SendPacket(new KeepAliveResponsePacket(packet.Value));
     }
     // 申请加入房间
     public void RequestJoinRoom(int roomId)
