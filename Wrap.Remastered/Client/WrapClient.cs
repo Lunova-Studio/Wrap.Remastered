@@ -773,18 +773,16 @@ public class WrapClient : IWrapClient, IDisposable
     {
         ConsoleWriter.WriteLine($"[P2P] 开始建立与 {targetUserId} 的P2P连接，目标端点: {peerEndPoint}");
 
-        // 创建本地TCP客户端
         var client = new TcpClient();
         client.Client.ExclusiveAddressUse = false;
         client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-
-        // 绑定到本地端点
         client.Client.Bind(_clientChannel!.LocalAddress);
 
-        bool connectionSucceeded = false;
         TcpClient? connectionToPeer = null;
+        bool connectionEstablished = false;
+        object connectLock = new object();
 
-        // 尝试连接任务（异步重试）
+        // 主动连接任务
         async Task ConnectToPeerAsync()
         {
             for (int i = 0; i < 8; i++)
@@ -793,23 +791,33 @@ public class WrapClient : IWrapClient, IDisposable
                 {
                     ConsoleWriter.WriteLine($"[P2P] 尝试连接到 {peerEndPoint} (第{i + 1}次)");
                     await client.ConnectAsync(peerEndPoint);
-                    connectionSucceeded = true;
-                    connectionToPeer = client;
+                    lock (connectLock)
+                    {
+                        if (!connectionEstablished)
+                        {
+                            connectionToPeer = client;
+                            connectionEstablished = true;
+                        }
+                        else
+                        {
+                            client.Close();
+                        }
+                    }
                     ConsoleWriter.WriteLine($"[P2P] 连接成功");
                     break;
                 }
                 catch (Exception ex)
                 {
                     ConsoleWriter.WriteLine($"[P2P] 连接失败 (第{i + 1}次): {ex.Message}");
-                    if (i < 3) // 不是最后一次尝试
+                    if (i < 3)
                     {
-                        await Task.Delay(1000); // 等待1秒后重试
+                        await Task.Delay(1000);
                     }
                 }
             }
         }
 
-        // 监听任务（异步）
+        // 被动监听任务
         TcpListener? listener = null;
         async Task ListenForPeerAsync()
         {
@@ -820,35 +828,23 @@ public class WrapClient : IWrapClient, IDisposable
                 listener.Server.ExclusiveAddressUse = false;
                 listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 listener.Start();
-
                 ConsoleWriter.WriteLine($"[P2P] 开始监听连接，本地端点: {(IPEndPoint)listener.LocalEndpoint}");
-
-                while (!connectionSucceeded)
+                while (true)
                 {
-                    try
+                    var peer = await listener.AcceptTcpClientAsync();
+                    lock (connectLock)
                     {
-                        var peer = await listener.AcceptTcpClientAsync();
-                        ConsoleWriter.WriteLine($"[P2P] 收到来自 {(IPEndPoint)peer.Client.RemoteEndPoint!} 的连接");
-
-                        if (connectionToPeer == null)
+                        if (!connectionEstablished)
                         {
                             connectionToPeer = peer;
-                            connectionSucceeded = true;
+                            connectionEstablished = true;
                         }
                         else
                         {
                             peer.Close();
-                            break;
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        if (!connectionSucceeded)
-                        {
-                            ConsoleWriter.WriteLine($"[P2P] 监听连接时出错: {ex.Message}");
-                            break;
-                        }
-                    }
+                    if (connectionEstablished) break;
                 }
             }
             catch (Exception ex)
@@ -862,15 +858,18 @@ public class WrapClient : IWrapClient, IDisposable
         var listenTask = ListenForPeerAsync();
         await Task.WhenAny(connectTask, listenTask);
 
-        // 清理监听器
+        // 等待第一个连接建立
+        while (!connectionEstablished)
+        {
+            await Task.Delay(50);
+        }
+        // 关闭监听器
         listener?.Stop();
 
         if (connectionToPeer == null)
         {
             client.Close();
             ConsoleWriter.WriteLine($"[P2P] 无法建立与 {targetUserId} 的P2P连接");
-
-            // 通知服务器连接失败
             await SendPacketAsync(new PeerConnectFailedPacket(
                 targetUserId,
                 "无法建立P2P连接",
@@ -879,12 +878,9 @@ public class WrapClient : IWrapClient, IDisposable
             return;
         }
 
-        // 创建P2P连接
         try
         {
             ConsoleWriter.WriteLine($"[P2P] 与 {targetUserId} 的P2P连接建立成功");
-
-            // 使用P2P连接管理器管理连接
             PeerConnectionManager.AddConnection(targetUserId, connectionToPeer);
         }
         catch (Exception ex)

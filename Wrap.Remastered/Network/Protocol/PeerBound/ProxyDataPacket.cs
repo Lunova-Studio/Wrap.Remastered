@@ -77,9 +77,6 @@ public class ProxyDataPacketSerializer : ISerializer<IPacket>
 
         var result = stream.ToArray();
         
-        // 添加调试信息
-        ConsoleWriter.WriteLine($"[序列化] 序列化代理数据包: ConnectionId={packet.ConnectionId}, DataLength={packet.Data.Length}, 总长度={result.Length}");
-        
         return result;
     }
 } 

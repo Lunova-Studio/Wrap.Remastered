@@ -192,9 +192,7 @@ public class ProxyManager : IDisposable
                 {
                     try
                     {
-                        ConsoleWriter.WriteLine($"[代理] 准备转发数据到客户端 {userId}: 连接ID={connectionId}, 数据大小={data.Length}字节");
                         await _client.SendPeerPacketAsync(userId, dataPacket);
-                        ConsoleWriter.WriteLine($"[代理] 数据已转发到客户端 {userId}");
                         
                         // 更新映射中的活动时间和字节数
                         _connectionMapping.UpdateActivity(connectionId);
@@ -279,8 +277,6 @@ public class ProxyManager : IDisposable
                 var data = new byte[bytesRead];
                 Array.Copy(buffer, 0, data, 0, bytesRead);
                 
-                ConsoleWriter.WriteLine($"[代理] 从目标服务器读取数据: 连接ID={connectionInfo.ConnectionId}, 大小={bytesRead}字节");
-                
                 var dataPacket = new ProxyDataPacket(connectionInfo.ConnectionId, data, false);
                 
                 // 通过映射找到对应的用户ID
@@ -290,13 +286,10 @@ public class ProxyManager : IDisposable
                     // 再次检查连接是否仍然存在和有效
                     if (!_connections.ContainsKey(connectionInfo.ConnectionId) || !connectionInfo.IsConnected)
                     {
-                        ConsoleWriter.WriteLine($"[代理] 连接已断开或不存在，跳过数据转发: {connectionInfo.ConnectionId}");
                         break;
                     }
                     
-                    ConsoleWriter.WriteLine($"[代理] 准备转发目标服务器数据到客户端 {userId}: 连接ID={connectionInfo.ConnectionId}, 数据大小={bytesRead}字节");
                     await _client.SendPeerPacketAsync(userId, dataPacket);
-                    ConsoleWriter.WriteLine($"[代理] 目标服务器数据已转发到客户端 {userId}, 时间戳: {DateTime.Now:HH:mm:ss.fff}");
                     
                     // 更新映射中的活动时间和字节数
                     _connectionMapping.UpdateActivity(connectionInfo.ConnectionId);
@@ -307,11 +300,7 @@ public class ProxyManager : IDisposable
                     ConsoleWriter.WriteLine($"[代理] 未找到连接 {connectionInfo.ConnectionId} 对应的用户ID");
                 }
                 
-                // 添加连接状态调试信息
-                ConsoleWriter.WriteLine($"[代理] 当前活跃连接数: {_connections.Count}");
-                
                 connectionInfo.LastActivity = DateTime.UtcNow;
-                ConsoleWriter.WriteLine($"[代理] 从目标服务器转发数据: {connectionInfo.ConnectionId}, 大小: {bytesRead} 字节");
                 ProxyDataTransferred?.Invoke(this, (connectionInfo.ConnectionId, bytesRead));
             }
         }
