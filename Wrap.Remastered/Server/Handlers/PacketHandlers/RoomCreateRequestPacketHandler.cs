@@ -23,10 +23,10 @@ public class RoomCreateRequestPacketHandler : RoomPacketHandler
         var infoPacket = new RoomInfoPacket(room);
         await Server.GetConnectionManager().SendPacketToUserAsync(userInfo.UserId, infoPacket);
         // 广播成员变动
-        await BroadcastRoomMembers(room);
+        await BroadcastRoomMembersAsync(room);
     }
 
-    private async Task BroadcastRoomMembers(Room room)
+    private async Task BroadcastRoomMembersAsync(Room room)
     {
         var infoPacket = new RoomInfoPacket(room);
         foreach (var user in room.Users)

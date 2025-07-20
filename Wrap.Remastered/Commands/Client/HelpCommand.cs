@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using ConsoleInteractive;
+using Wrap.Remastered.Client;
 
 namespace Wrap.Remastered.Commands.Client;
 
@@ -8,11 +9,11 @@ namespace Wrap.Remastered.Commands.Client;
 /// </summary>
 public class HelpCommand : CommandBase, ICommandTabCompleter
 {
-    private readonly CommandManager _commandManager;
+    private readonly WrapClient _client;
 
-    public HelpCommand(CommandManager commandManager)
+    public HelpCommand(WrapClient client)
     {
-        _commandManager = commandManager ?? throw new ArgumentNullException(nameof(commandManager));
+        _client = client ?? throw new ArgumentNullException(nameof(client));
     }
 
     public override string GetName() => "help";
@@ -25,11 +26,11 @@ public class HelpCommand : CommandBase, ICommandTabCompleter
     {
         if (args.Length == 0)
         {
-            _commandManager.ShowHelp();
+            _client.GetClientCommandManager().ShowHelp();
         }
         else
         {
-            _commandManager.ShowCommandHelp(args[0]);
+            _client.GetClientCommandManager().ShowCommandHelp(args[0]);
         }
     }
 
@@ -37,7 +38,7 @@ public class HelpCommand : CommandBase, ICommandTabCompleter
     {
         if (args.Length == 1)
         {
-            return _commandManager.GetAllCommands();
+            return _client.GetClientCommandManager().GetAllCommands();
         }
 
         return new List<string>();

@@ -148,6 +148,11 @@ public class ClientHandler : ChannelHandlerAdapter
                     {
                         _client.OnRoomChatMessageReceived(chatMsgPacket);
                     }
+                    // 处理用户信息查询结果
+                    else if (packet is UserInfoResultPacket userInfoResultPacket)
+                    {
+                        _client.OnUserInfoResultReceived(userInfoResultPacket);
+                    }
                 }
             }
         }

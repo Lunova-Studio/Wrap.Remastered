@@ -3,6 +3,7 @@ using ConsoleInteractive;
 using Wrap.Remastered.Commands;
 using Wrap.Remastered.Commands.Client;
 using Wrap.Remastered.Client;
+using DotNetty.Common.Concurrency;
 
 namespace Wrap.Remastered.Client;
 
@@ -31,15 +32,17 @@ public class ClientCommandManager
         _commandManager.RegisterCommandExecuter(new ConnectCommand(_client));
         _commandManager.RegisterCommandExecuter(new LoginCommand(_client));
         _commandManager.RegisterCommandExecuter(new DisconnectCommand(_client));
-        _commandManager.RegisterCommandExecuter(new HelpCommand(_commandManager));
+        _commandManager.RegisterCommandExecuter(new HelpCommand(_client));
         _commandManager.RegisterCommandExecuter(new SetNameCommand(_client));
         _commandManager.RegisterCommandExecuter(new SetDisplayNameCommand(_client));
         _commandManager.RegisterCommandExecuter(new RoomCommand(_client));
+        _commandManager.RegisterCommandExecuter(new UserCommand(_client));
 
         // 注册标签页补全器
         _commandManager.RegisterCommandTabCompleter(new ConnectCommand(_client));
-        _commandManager.RegisterCommandTabCompleter(new HelpCommand(_commandManager));
+        _commandManager.RegisterCommandTabCompleter(new HelpCommand(_client));
         _commandManager.RegisterCommandTabCompleter(new RoomCommand(_client));
+        _commandManager.RegisterCommandTabCompleter(new UserCommand(_client));
     }
 
     /// <summary>
@@ -77,5 +80,15 @@ public class ClientCommandManager
     public void ShowHelp()
     {
         _commandManager.ShowHelp();
+    }
+
+    public void ShowCommandHelp(string commandLine)
+    {
+        _commandManager.ShowCommandHelp(commandLine);
+    }
+
+    public IList<string> GetAllCommands()
+    {
+        return _commandManager.GetAllCommands();
     }
 } 

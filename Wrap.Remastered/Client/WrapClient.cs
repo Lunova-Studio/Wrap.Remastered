@@ -40,6 +40,8 @@ public class WrapClient : IWrapClient, IDisposable
     private readonly List<string> _pendingJoinUserIds = new();
     public IReadOnlyList<string> PendingJoinUserIds => _pendingJoinUserIds.AsReadOnly();
     public event EventHandler<RoomChatMessagePacket>? RoomChatMessageReceived;
+    public event EventHandler<UserInfoResultPacket>? UserInfoResultReceived;
+    public UserInfoResultPacket? LastUserInfoResult { get; private set; }
 
     public bool Disposed => _disposed;
     public bool IsConnected => _isConnected && _clientChannel?.Active == true;
@@ -49,6 +51,7 @@ public class WrapClient : IWrapClient, IDisposable
     public string? Name => _userInfo?.Name ?? _profile.Name;
     public string? DisplayName => _userInfo?.DisplayName ?? _profile.DisplayName;
     public UserProfile Profile => _profile;
+    public ClientCommandManager ClientCommandManager { get; private set; }
 
     public event EventHandler? Connected;
     public event EventHandler<string>? Disconnected;
@@ -61,6 +64,7 @@ public class WrapClient : IWrapClient, IDisposable
     /// </summary>
     public WrapClient()
     {
+        ClientCommandManager = new ClientCommandManager(this);
     }
 
     /// <summary>
@@ -70,6 +74,7 @@ public class WrapClient : IWrapClient, IDisposable
     public WrapClient(UserInfo userInfo)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        ClientCommandManager = new ClientCommandManager(this);
     }
 
     /// <summary>
@@ -355,6 +360,12 @@ public class WrapClient : IWrapClient, IDisposable
         var time = packet.Timestamp.ToLocalTime().ToString("HH:mm:ss");
         ConsoleWriter.WriteLineFormatted($"§b[{time}] §a{packet.SenderDisplayName}§f: {packet.Message}");
     }
+    internal void OnUserInfoResultReceived(UserInfoResultPacket packet)
+    {
+        LastUserInfoResult = packet;
+        UserInfoResultReceived?.Invoke(this, packet);
+        ConsoleWriter.WriteLineFormatted($"§a用户信息: UserId={packet.UserInfo.UserId}, Name={packet.UserInfo.Name}, DisplayName={packet.UserInfo.DisplayName}");
+    }
     // 申请加入房间
     public void RequestJoinRoom(int roomId)
     {
@@ -387,7 +398,16 @@ public class WrapClient : IWrapClient, IDisposable
     {
         SendPacket(new RoomKickPacket(roomId, userId));
     }
+    // 查询用户信息
+    public void QueryUserInfo(string userId)
+    {
+        SendPacket(new UserInfoQueryPacket(userId));
+    }
 
+    public ClientCommandManager GetClientCommandManager()
+    {
+        return ClientCommandManager;
+    }
 
     private void CheckDisposed()
     {
