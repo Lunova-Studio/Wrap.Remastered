@@ -25,7 +25,7 @@ public class UsersCommand : CommandBase
 
     public override string GetUsage() => "users";
 
-    public override void OnExecute(string[] args)
+    public override async Task OnExecuteAsync(string[] args)
     {
         var connections = _server.GetConnectionManager().GetAllUserConnections()
             .Where(c => c.UserInfo != null && c.IsActive)

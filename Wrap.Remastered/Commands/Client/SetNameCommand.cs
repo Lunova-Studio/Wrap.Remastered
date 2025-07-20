@@ -17,7 +17,7 @@ public class SetNameCommand : CommandBase
     public override string GetDescription() => "设置本地用户名";
     public override string GetUsage() => "setname <用户名>";
 
-    public override void OnExecute(string[] args)
+    public override async Task OnExecuteAsync(string[] args)
     {
         if (args.Length < 1)
         {

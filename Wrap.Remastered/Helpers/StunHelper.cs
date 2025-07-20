@@ -13,30 +13,17 @@ namespace Wrap.Remastered.Helpers;
 public static class StunHelper
 {
     public static string STUNServer { get; set; } = "stun.hot-chilli.net";
-    public static IPEndPoint GetRemoteIP(IPEndPoint localIp)
-    {
-        return GetRemoteIPAsync(localIp).GetAwaiter().GetResult();
-    }
-    public static IPEndPoint GetRemoteIP(Socket socket)
-    {
-        return GetRemoteIPAsync(socket).GetAwaiter().GetResult();
-    }
     public static async Task<IPEndPoint> GetRemoteIPAsync(IPEndPoint localIp)
     {
         using StunClient3489 stunClient = new(new((await Dns.GetHostAddressesAsync(STUNServer)).First(), 3478), localIp);
         await stunClient.QueryAsync();
         return stunClient.State.PublicEndPoint!;
     }
-
     public static async Task<IPEndPoint> GetRemoteIPAsync(Socket socket)
     {
         using StunClient3489 stunClient = new(new((await Dns.GetHostAddressesAsync(STUNServer)).First(), 3478), (IPEndPoint)socket.LocalEndPoint!, new NoneUdpProxy(socket));
         await stunClient.QueryAsync();
         return stunClient.State.PublicEndPoint!;
-    }
-    public static NatType GetNatType()
-    {
-        return GetNatTypeAsync().GetAwaiter().GetResult();
     }
     public static async Task<NatType> GetNatTypeAsync()
     {

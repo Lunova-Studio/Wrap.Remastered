@@ -116,7 +116,7 @@ class Program
         {
             // 自动同意P2P连接请求
             ConsoleWriter.WriteLineFormatted($"§a[P2P] 自动同意来自 {packet.RequesterDisplayName} 的P2P连接请求");
-            client.SendPacket(new PeerConnectAcceptPacket(packet.RequesterUserId));
+            client.SendPacketAsync(new PeerConnectAcceptPacket(packet.RequesterUserId));
         }
     }
 }

@@ -22,12 +22,12 @@ public class DisconnectCommand : CommandBase
 
     public override string GetUsage() => "disconnect";
 
-    public override void OnExecute(string[] args)
+    public override async Task OnExecuteAsync(string[] args)
     {
         try
         {
             ConsoleWriter.WriteLineFormatted("§e正在断开连接...");
-            _client.DisconnectAsync().Wait();
+            await _client.DisconnectAsync();
             ConsoleWriter.WriteLineFormatted("§a已断开连接");
         }
         catch (Exception ex)

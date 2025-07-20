@@ -9,6 +9,7 @@ public static class UPnPHelper
 {
     public static async Task<IUPnPService?> LookUpUPnPDeviceAsync(TimeSpan timeout)
     {
+        CancellationTokenSource cts = new CancellationTokenSource(timeout);
         List<UPnPDevice> UPnPDeviceLocations = new();
 
         bool Searching = true;
@@ -32,7 +33,7 @@ public static class UPnPHelper
         DateTime time = DateTime.Now;
         while ((DateTime.Now - time) < timeout && UPnPDeviceLocations.Count == 0)
         {
-            await Task.Delay(100);
+            await Task.Delay(100, cts.Token);
         }
 
         Searching = false;
@@ -47,6 +48,7 @@ public static class UPnPHelper
                 if (natService != null)
                 {
                     uPnP = new UPnPService(natService);
+                    await cts.CancelAsync();
                     break;
                 }
             }

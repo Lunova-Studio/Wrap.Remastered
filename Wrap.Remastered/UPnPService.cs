@@ -26,7 +26,7 @@ public class UPnPService : IUPnPService
     public async Task AddPortMappingAsync(IPAddress? NewRemoteHost, int NewExternalPort, IUPnPService.SocketProtocol NewProtocol, IPAddress NewInternalClient, int NewInternalPort, bool NewEnabled, string NewPortMappingDescription, TimeSpan NewLeaseDuration)
     {
         await (await Service.GetServiceAsync()).InvokeAsync("AddPortMapping", 3000,
-                new KeyValuePair<string, object>("NewRemoteHost", (NewRemoteHost is null) ? GetExternalIPAddress().ToString() : NewRemoteHost.ToString()),
+                new KeyValuePair<string, object>("NewRemoteHost", (NewRemoteHost is null) ? (await GetExternalIPAddressAsync()).ToString() : NewRemoteHost.ToString()),
                 new KeyValuePair<string, object>("NewExternalPort", NewExternalPort),
                 new KeyValuePair<string, object>("NewProtocol", NewProtocol.ToString()),
                 new KeyValuePair<string, object>("NewInternalPort", NewInternalPort),
@@ -55,6 +55,12 @@ public class UPnPService : IUPnPService
     public IPAddress GetExternalIPAddress()
     {
         string address = (string)Service.GetService().InvokeAsync("GetExternalIPAddress", 3000).GetAwaiter().GetResult().Value["NewExternalIPAddress"];
+        return IPAddress.Parse(address);
+    }
+
+    public async Task<IPAddress> GetExternalIPAddressAsync()
+    {
+        string address = (string)(await((await Service.GetServiceAsync()).InvokeAsync("GetExternalIPAddress", 3000))).Value["NewExternalIPAddress"];
         return IPAddress.Parse(address);
     }
 

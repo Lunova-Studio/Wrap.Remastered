@@ -21,7 +21,7 @@ public class BroadcastCommand : CommandBase
 
     public override string GetUsage() => "broadcast <消息>";
 
-    public override void OnExecute(string[] args)
+    public override async Task OnExecuteAsync(string[] args)
     {
         if (args.Length == 0)
         {
@@ -32,7 +32,7 @@ public class BroadcastCommand : CommandBase
         var message = string.Join(" ", args);
         var messageData = System.Text.Encoding.UTF8.GetBytes(message);
 
-        var successCount = _server.GetConnectionManager().BroadcastToUsersAsync(messageData).Result;
+        var successCount = await _server.GetConnectionManager().BroadcastToUsersAsync(messageData);
 
         ConsoleWriter.WriteLineFormatted($"§a广播消息已发送给 {successCount} 个用户");
         ConsoleWriter.WriteLineFormatted($"§f消息内容: {message}");

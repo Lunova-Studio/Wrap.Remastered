@@ -209,13 +209,6 @@ public class WrapClient : IWrapClient, IDisposable
         }
     }
 
-    public void Connect(string serverAddress, int port = 10270)
-    {
-#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
-        ConnectAsync(serverAddress, port).GetAwaiter().GetResult();
-#pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
-    }
-
     public async Task DisconnectAsync()
     {
         CheckDisposed();
@@ -243,13 +236,6 @@ public class WrapClient : IWrapClient, IDisposable
             Disconnected?.Invoke(this, "");
         }
         catch (Exception) { }
-    }
-
-    public void Disconnect()
-    {
-#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
-        DisconnectAsync().GetAwaiter().GetResult();
-#pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
     }
 
     public async Task SendPacketAsync(IServerBoundPacket packet)
@@ -287,13 +273,6 @@ public class WrapClient : IWrapClient, IDisposable
         {
             throw;
         }
-    }
-
-    public void SendPacket(IServerBoundPacket packet)
-    {
-#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
-        SendPacketAsync(packet).GetAwaiter().GetResult();
-#pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
     }
 
     /// <summary>
@@ -337,17 +316,17 @@ public class WrapClient : IWrapClient, IDisposable
         _ = InitializeProxyAsync();
     }
 
-    internal void OnDataReceived(UnsolvedPacket unsolved)
+    internal async Task OnDataReceivedAsync(UnsolvedPacket unsolved)
     {
         DataReceived?.Invoke(this, unsolved);
     }
 
-    internal void OnPacketReceived(IClientBoundPacket packet)
+    internal async Task OnPacketReceivedAsync(IClientBoundPacket packet)
     {
         PacketReceived?.Invoke(this, packet);
     }
 
-    internal void OnDisconnectPacketReceived(DisconnectPacket packet)
+    internal async Task OnDisconnectPacketReceivedAsync(DisconnectPacket packet)
     {
         _isConnected = false;
         _isLoggedIn = false;
@@ -357,26 +336,26 @@ public class WrapClient : IWrapClient, IDisposable
         _ = DisconnectAsync();
     }
 
-    internal void OnRoomInfoReceived(RoomInfoPacket packet)
+    internal async Task OnRoomInfoReceivedAsync(RoomInfoPacket packet)
     {
         CurrentRoomInfo = packet;
         RoomInfoReceived?.Invoke(this, packet);
         ConsoleWriter.WriteLine($"[房间] 加入房间: {packet.RoomName} (ID: {packet.RoomId})，房主: {packet.Owner.DisplayName}，成员数: {packet.Users.Count}/{packet.MaxUsers}");
 
         // 自动建立P2P连接
-        AutoEstablishP2PConnections(packet);
+        await AutoEstablishP2PConnectionsAsync(packet);
 
         // 重新初始化代理功能（因为房间信息可能已更新）
-        _ = InitializeProxyAsync();
+        await InitializeProxyAsync();
     }
 
-    internal void OnRoomOwnerChanged(RoomOwnerChangedPacket packet)
+    internal async Task OnRoomOwnerChangedAsync(RoomOwnerChangedPacket packet)
     {
         LastRoomOwnerChanged = packet;
         RoomOwnerChanged?.Invoke(this, packet);
         ConsoleWriter.WriteLine($"[房间] 房主已变更，房间ID: {packet.RoomId}，新房主UserId: {packet.NewOwnerUserId}");
     }
-    internal void OnRoomDismissed(RoomDismissedPacket packet)
+    internal async Task OnRoomDismissedAsync(RoomDismissedPacket packet)
     {
         if (CurrentRoomInfo != null && CurrentRoomInfo.RoomId == packet.RoomId)
         {
@@ -387,13 +366,13 @@ public class WrapClient : IWrapClient, IDisposable
         ConsoleWriter.WriteLine($"[房间] 房间已解散，房间ID: {packet.RoomId}");
         PeerConnectionManager.CloseAllConnections();
     }
-    internal void OnRoomInfoQueryResult(RoomInfoQueryResultPacket packet)
+    internal async Task OnRoomInfoQueryResultAsync(RoomInfoQueryResultPacket packet)
     {
         LastRoomInfoQueryResult = packet;
         RoomInfoQueryResultReceived?.Invoke(this, packet);
         ConsoleWriter.WriteLine($"[房间] 查询结果：房间ID: {packet.RoomId}，名称: {packet.RoomName}，房主: {packet.OwnerUserId}，人数: {packet.UserCount}/{packet.MaxUsers}");
     }
-    internal void OnRoomJoinRequestNotice(RoomJoinRequestNoticePacket packet)
+    internal async Task OnRoomJoinRequestNoticeAsync(RoomJoinRequestNoticePacket packet)
     {
         LastRoomJoinRequestNotice = packet;
         if (!string.IsNullOrEmpty(packet.ApplicantUserId) && !_pendingJoinUserIds.Contains(packet.ApplicantUserId))
@@ -403,7 +382,7 @@ public class WrapClient : IWrapClient, IDisposable
         RoomJoinRequestNoticeReceived?.Invoke(this, packet);
         ConsoleWriter.WriteLine($"[房间] 有用户申请加入房间，房间ID: {packet.RoomId}，申请者UserId: {packet.ApplicantUserId}");
     }
-    internal void OnRoomJoinResult(RoomJoinResultPacket packet)
+    internal async Task OnRoomJoinResultAsync(RoomJoinResultPacket packet)
     {
         LastRoomJoinResult = packet;
         RoomJoinResultReceived?.Invoke(this, packet);
@@ -418,45 +397,45 @@ public class WrapClient : IWrapClient, IDisposable
             ConsoleWriter.WriteLine($"[房间] 申请加入房间{packet.RoomId}结果: {(packet.Success ? "成功" : "失败")}，消息: {packet.Message}");
         }
     }
-    internal void OnRoomChatMessageReceived(RoomChatMessagePacket packet)
+    internal async Task OnRoomChatMessageReceivedAsync(RoomChatMessagePacket packet)
     {
         RoomChatMessageReceived?.Invoke(this, packet);
         var time = packet.Timestamp.ToLocalTime().ToString("HH:mm:ss");
         ConsoleWriter.WriteLineFormatted($"§b[{time}] §a{packet.SenderDisplayName}§f: {packet.Message}");
     }
-    internal void OnUserInfoResultReceived(UserInfoResultPacket packet)
+    internal async Task OnUserInfoResultReceivedAsync(UserInfoResultPacket packet)
     {
         LastUserInfoResult = packet;
         UserInfoResultReceived?.Invoke(this, packet);
         ConsoleWriter.WriteLineFormatted($"§a用户信息: UserId={packet.UserInfo.UserId}, Name={packet.UserInfo.Name}, DisplayName={packet.UserInfo.DisplayName}");
     }
-    internal void OnKeepAliveReceived(KeepAlivePacket packet)
+    internal async Task OnKeepAliveReceivedAsync(KeepAlivePacket packet)
     {
         KeepAliveReceived?.Invoke(this, packet);
         // 立即回复相同的Value
-        SendPacket(new KeepAliveResponsePacket(packet.Value));
+        await SendPacketAsync(new KeepAliveResponsePacket(packet.Value));
     }
 
     // P2P连接处理方法
-    internal void OnPeerConnectRequestReceived(PeerConnectRequestNoticePacket packet)
+    internal async Task OnPeerConnectRequestReceivedAsync(PeerConnectRequestNoticePacket packet)
     {
         PeerConnectRequestReceived?.Invoke(this, packet);
         ConsoleWriter.WriteLine($"[P2P] 收到来自 {packet.RequesterDisplayName} 的P2P连接请求");
     }
 
-    internal void OnPeerConnectAcceptReceived(PeerConnectAcceptNoticePacket packet)
+    internal async Task OnPeerConnectAcceptReceivedAsync(PeerConnectAcceptNoticePacket packet)
     {
         PeerConnectAcceptReceived?.Invoke(this, packet);
         ConsoleWriter.WriteLine($"[P2P] {packet.AccepterDisplayName} 接受了你的P2P连接请求");
     }
 
-    internal void OnPeerConnectRejectReceived(PeerConnectRejectNoticePacket packet)
+    internal async Task OnPeerConnectRejectReceivedAsync(PeerConnectRejectNoticePacket packet)
     {
         PeerConnectRejectReceived?.Invoke(this, packet);
         ConsoleWriter.WriteLine($"[P2P] {packet.RejecterDisplayName} 拒绝了你的P2P连接请求，原因: {packet.Reason}");
     }
 
-    internal void OnPeerIPInfoReceived(PeerIPInfoPacket packet)
+    internal async Task OnPeerIPInfoReceivedAsync(PeerIPInfoPacket packet)
     {
         PeerIPInfoReceived?.Invoke(this, packet);
         ConsoleWriter.WriteLine($"[P2P] 收到 {packet.TargetUserId} 的IP信息，准备建立P2P连接");
@@ -476,7 +455,7 @@ public class WrapClient : IWrapClient, IDisposable
         });
     }
 
-    internal void OnPeerConnectSuccessReceived(PeerConnectSuccessPacket packet)
+    internal async Task OnPeerConnectSuccessReceivedAsync(PeerConnectSuccessPacket packet)
     {
         PeerConnectSuccessReceived?.Invoke(this, packet);
         ConsoleWriter.WriteLine($"[P2P] 与 {packet.TargetUserId} 的P2P连接建立成功");
@@ -498,7 +477,7 @@ public class WrapClient : IWrapClient, IDisposable
         }
     }
 
-    internal void OnPeerConnectFailedReceived(PeerConnectFailedNoticePacket packet)
+    internal async Task OnPeerConnectFailedReceivedAsync(PeerConnectFailedNoticePacket packet)
     {
         PeerConnectFailedReceived?.Invoke(this, packet);
         ConsoleWriter.WriteLine($"[P2P] 与 {packet.TargetUserId} 的P2P连接失败，原因: {packet.Reason}");
@@ -508,7 +487,7 @@ public class WrapClient : IWrapClient, IDisposable
     /// 自动建立P2P连接
     /// </summary>
     /// <param name="roomInfo">房间信息</param>
-    private void AutoEstablishP2PConnections(RoomInfoPacket roomInfo)
+    private async Task AutoEstablishP2PConnectionsAsync(RoomInfoPacket roomInfo)
     {
         if (_userInfo == null) return;
 
@@ -523,48 +502,48 @@ public class WrapClient : IWrapClient, IDisposable
                 if (user.UserId != currentUserId)
                 {
                     ConsoleWriter.WriteLine($"[P2P] 房主自动向成员 {user.DisplayName} 发起P2P连接");
-                    SendPacket(new PeerConnectRequestPacket(user.UserId));
+                    await SendPacketAsync(new PeerConnectRequestPacket(user.UserId));
                 }
             }
         }
         // 普通成员不主动发起P2P连接，只等待房主的连接请求
     }
     // 申请加入房间
-    public void RequestJoinRoom(int roomId)
+    public async Task RequestJoinRoomAsync(int roomId)
     {
-        SendPacket(new RoomJoinRequestPacket(roomId));
+        await SendPacketAsync(new RoomJoinRequestPacket(roomId));
     }
     // 房主审批同意用户加入
-    public void ApproveJoinRoom(int roomId, string userId)
+    public async Task ApproveJoinRoomAsync(int roomId, string userId)
     {
-        SendPacket(new RoomJoinApprovePacket(roomId, userId));
+        await SendPacketAsync(new RoomJoinApprovePacket(roomId, userId));
         _pendingJoinUserIds.Remove(userId);
     }
     // 房主拒绝用户加入
-    public void RejectJoinRoom(int roomId, string userId)
+    public async Task RejectJoinRoomAsync(int roomId, string userId)
     {
-        SendPacket(new RoomJoinRejectPacket(roomId, userId));
+        await SendPacketAsync(new RoomJoinRejectPacket(roomId, userId));
         _pendingJoinUserIds.Remove(userId);
     }
     // 房主主动转让房主
-    public void TransferRoomOwner(int roomId, string newOwnerUserId)
+    public async Task TransferRoomOwnerAsync(int roomId, string newOwnerUserId)
     {
-        SendPacket(new RoomTransferOwnerPacket(roomId, newOwnerUserId));
+        await SendPacketAsync(new RoomTransferOwnerPacket(roomId, newOwnerUserId));
     }
     // 房主主动解散房间
-    public void DismissRoom(int roomId)
+    public async Task DismissRoomAsync(int roomId)
     {
-        SendPacket(new RoomDismissPacket(roomId));
+        await SendPacketAsync(new RoomDismissPacket(roomId));
     }
     // 踢人（房主主动调用）
-    public void KickUserFromRoom(int roomId, string userId)
+    public async Task KickUserFromRoomAsync(int roomId, string userId)
     {
-        SendPacket(new RoomKickPacket(roomId, userId));
+        await SendPacketAsync(new RoomKickPacket(roomId, userId));
     }
     // 查询用户信息
-    public void QueryUserInfo(string userId)
+    public async Task QueryUserInfoAsync(string userId)
     {
-        SendPacket(new UserInfoQueryPacket(userId));
+        await SendPacketAsync(new UserInfoQueryPacket(userId));
     }
 
     public ClientCommandManager GetClientCommandManager()
@@ -805,15 +784,15 @@ public class WrapClient : IWrapClient, IDisposable
         bool connectionSucceeded = false;
         TcpClient? connectionToPeer = null;
 
-        // 尝试连接任务
-        var connectTask = Task.Run(() =>
+        // 尝试连接任务（异步重试）
+        async Task ConnectToPeerAsync()
         {
             for (int i = 0; i < 8; i++)
             {
                 try
                 {
                     ConsoleWriter.WriteLine($"[P2P] 尝试连接到 {peerEndPoint} (第{i + 1}次)");
-                    client.Connect(peerEndPoint);
+                    await client.ConnectAsync(peerEndPoint);
                     connectionSucceeded = true;
                     connectionToPeer = client;
                     ConsoleWriter.WriteLine($"[P2P] 连接成功");
@@ -824,32 +803,32 @@ public class WrapClient : IWrapClient, IDisposable
                     ConsoleWriter.WriteLine($"[P2P] 连接失败 (第{i + 1}次): {ex.Message}");
                     if (i < 3) // 不是最后一次尝试
                     {
-                        Thread.Sleep(1000); // 等待1秒后重试
+                        await Task.Delay(1000); // 等待1秒后重试
                     }
                 }
             }
-        });
+        }
 
-        // 监听任务
+        // 监听任务（异步）
         TcpListener? listener = null;
-        var listenTask = Task.Run(() =>
+        async Task ListenForPeerAsync()
         {
             try
             {
-                IPEndPoint endPoint = ((IPEndPoint)_clientChannel!.LocalAddress);
+                IPEndPoint endPoint = (IPEndPoint)_clientChannel!.LocalAddress;
                 listener = new TcpListener(endPoint.Address, endPoint.Port);
                 listener.Server.ExclusiveAddressUse = false;
                 listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 listener.Start();
 
-                ConsoleWriter.WriteLine($"[P2P] 开始监听连接，本地端点: {((IPEndPoint)listener.LocalEndpoint)}");
+                ConsoleWriter.WriteLine($"[P2P] 开始监听连接，本地端点: {(IPEndPoint)listener.LocalEndpoint}");
 
                 while (!connectionSucceeded)
                 {
                     try
                     {
-                        var peer = listener.AcceptTcpClient();
-                        ConsoleWriter.WriteLine($"[P2P] 收到来自 {((IPEndPoint)peer.Client.RemoteEndPoint!)} 的连接");
+                        var peer = await listener.AcceptTcpClientAsync();
+                        ConsoleWriter.WriteLine($"[P2P] 收到来自 {(IPEndPoint)peer.Client.RemoteEndPoint!} 的连接");
 
                         if (connectionToPeer == null)
                         {
@@ -876,9 +855,11 @@ public class WrapClient : IWrapClient, IDisposable
             {
                 ConsoleWriter.WriteLine($"[P2P] 启动监听器失败: {ex.Message}");
             }
-        });
+        }
 
-        // 等待连接完成
+        // 并发执行连接和监听
+        var connectTask = ConnectToPeerAsync();
+        var listenTask = ListenForPeerAsync();
         await Task.WhenAny(connectTask, listenTask);
 
         // 清理监听器
@@ -905,21 +886,10 @@ public class WrapClient : IWrapClient, IDisposable
 
             // 使用P2P连接管理器管理连接
             PeerConnectionManager.AddConnection(targetUserId, connectionToPeer);
-
-            // 通知服务器连接成功
-            await SendPacketAsync(new PeerConnectSuccessPacket(targetUserId));
         }
         catch (Exception ex)
         {
-            ConsoleWriter.WriteLine($"[P2P] 创建P2P连接时出错: {ex.Message}");
-            connectionToPeer.Close();
-
-            // 通知服务器连接失败
-            await SendPacketAsync(new PeerConnectFailedPacket(
-                targetUserId,
-                ex.Message,
-                DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-            ));
+            ConsoleWriter.WriteLine($"[P2P] 管理P2P连接时出错: {ex.Message}");
         }
     }
 
@@ -938,7 +908,7 @@ public class WrapClient : IWrapClient, IDisposable
             // 释放P2P连接管理器
             PeerConnectionManager?.Dispose();
 
-            UPnPService?.DeletePortMapping(RemoteIP.Port, IUPnPService.SocketProtocol.TCP);
+            UPnPService?.DeletePortMapping(RemoteIP.Port, SocketProtocol.TCP);
 
             // 异步断开连接，但不等待完成
             _ = DisconnectAsync();

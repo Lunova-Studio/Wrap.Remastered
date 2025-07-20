@@ -98,17 +98,13 @@ public class LocalProxyServer : IDisposable
         {
             throw new InvalidOperationException("代理服务器已关闭或未初始化");
         }
-        
         try
         {
             _listener.Start();
             _isRunning = true;
-            
             ConsoleWriter.WriteLine($"[本地代理] 本地代理服务器已启动，监听端口: {LocalPort}");
             ConsoleWriter.WriteLine($"[本地代理] 转发目标: {TargetAddress}:{TargetPort}");
-            
-            // 启动监听任务
-            _ = Task.Run(ListenForConnectionsAsync);
+            await ListenForConnectionsAsync();
         }
         catch (Exception ex)
         {
@@ -154,7 +150,7 @@ public class LocalProxyServer : IDisposable
             try
             {
                 var client = await _listener!.AcceptTcpClientAsync();
-                _ = Task.Run(() => HandleLocalConnectionAsync(client));
+                await HandleLocalConnectionAsync(client);
             }
             catch (Exception ex)
             {
@@ -215,7 +211,7 @@ public class LocalProxyServer : IDisposable
             ConsoleWriter.WriteLine($"[本地代理] 已发送代理连接请求: {connectionId} -> {TargetAddress}:{TargetPort}");
             
             // 启动数据转发任务
-            _ = Task.Run(() => ForwardDataFromLocalAsync(connectionInfo));
+            await ForwardDataFromLocalAsync(connectionInfo);
             
             LocalConnectionEstablished?.Invoke(this, connectionId);
         }

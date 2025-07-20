@@ -121,7 +121,7 @@ public class CommandManager
 
         try
         {
-            executor.OnExecute(args);
+            executor.OnExecuteAsync(args).Wait();
         }
         catch (Exception ex)
         {

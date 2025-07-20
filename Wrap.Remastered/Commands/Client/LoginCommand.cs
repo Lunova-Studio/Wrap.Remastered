@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using ConsoleInteractive;
-using Wrap.Remastered.Client;
 using Wrap.Remastered.Network.Protocol.ServerBound;
 using Wrap.Remastered.Schemas;
 using System.Text.Json.Serialization;
+using Wrap.Remastered.Client;
 
 namespace Wrap.Remastered.Commands.Client;
 
@@ -26,7 +26,7 @@ public class LoginCommand : CommandBase
 
     public override string GetUsage() => "login <用户名> [显示名称]";
 
-    public override void OnExecute(string[] args)
+    public override async Task OnExecuteAsync(string[] args)
     {
         var profile = _client.Profile;
         string userName = profile.Name;
@@ -79,7 +79,7 @@ public class LoginCommand : CommandBase
             };
 
             ConsoleWriter.WriteLineFormatted($"§a正在登录: {displayName}...");
-            _client.SendLoginPacketAsync(userInfo).Wait();
+            await _client.SendLoginPacketAsync(userInfo);
         }
         catch (Exception ex)
         {

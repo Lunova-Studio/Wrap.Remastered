@@ -27,5 +27,5 @@ public abstract class CommandBase : ICommandExecuter
     /// 执行命令
     /// </summary>
     /// <param name="args">命令参数</param>
-    public abstract void OnExecute(string[] args);
+    public abstract Task OnExecuteAsync(string[] args);
 } 

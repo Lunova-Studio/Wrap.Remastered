@@ -68,10 +68,10 @@ public class ClientHandler : ChannelHandlerAdapter
                 buffer.ReadBytes(data);
 
                 var unsolvedPacket = new UnsolvedPacket(packetType, data);
-                _client.OnDataReceived(unsolvedPacket);
+                _client.OnDataReceivedAsync(unsolvedPacket);
 
                 // 尝试解析为具体的客户端数据包
-                TryParseClientBoundPacket(packetType, data);
+                TryParseClientBoundPacketAsync(packetType, data);
             }
         }
         catch (Exception) { }
@@ -89,7 +89,7 @@ public class ClientHandler : ChannelHandlerAdapter
     /// </summary>
     /// <param name="packetType">数据包类型</param>
     /// <param name="data">数据</param>
-    private void TryParseClientBoundPacket(int packetType, byte[] data)
+    private async Task TryParseClientBoundPacketAsync(int packetType, byte[] data)
     {
         try
         {
@@ -98,15 +98,13 @@ public class ClientHandler : ChannelHandlerAdapter
                 var packet = serializer.Deserialize(data) as IClientBoundPacket;
                 if (packet != null)
                 {
-                    _client.OnPacketReceived(packet);
+                    await _client.OnPacketReceivedAsync(packet);
 
                     // 处理登录成功响应
                     if (packet is LoginSucceedPacket loginSucceed)
                     {
                         _client.RemoteIP = new IPEndPoint(new IPAddress(loginSucceed.IPAddress), loginSucceed.Port);
-#pragma warning disable VSTHRD110 // Observe result of async calls
-                        _ = _client.UPnPService?.AddPortMappingAsync(_client.RemoteIP.Port, IUPnPService.SocketProtocol.TCP, ((IPEndPoint)_client._clientChannel!.LocalAddress).Port, "WrapClient");
-#pragma warning restore VSTHRD110 // Observe result of async calls
+                        _client!.UPnPService?.AddPortMappingAsync(_client!.RemoteIP.Port, IUPnPService.SocketProtocol.TCP, ((IPEndPoint)_client._clientChannel!.LocalAddress).Port, "WrapClient");
                         var userInfo = new UserInfo
                         {
                             UserId = loginSucceed.UserId,
@@ -118,82 +116,82 @@ public class ClientHandler : ChannelHandlerAdapter
                     // 处理断开连接包
                     else if (packet is DisconnectPacket disconnectPacket)
                     {
-                        _client.OnDisconnectPacketReceived(disconnectPacket);
+                        await _client.OnDisconnectPacketReceivedAsync(disconnectPacket);
                     }
                     // 处理房间信息包
                     else if (packet is RoomInfoPacket roomInfoPacket)
                     {
-                        _client.OnRoomInfoReceived(roomInfoPacket);
+                        await _client.OnRoomInfoReceivedAsync(roomInfoPacket);
                     }
                     // 处理房主变更通知
                     else if (packet is RoomOwnerChangedPacket ownerChangedPacket)
                     {
-                        _client.OnRoomOwnerChanged(ownerChangedPacket);
+                        await _client.OnRoomOwnerChangedAsync(ownerChangedPacket);
                     }
                     // 处理房间解散通知
                     else if (packet is RoomDismissedPacket dismissedPacket)
                     {
-                        _client.OnRoomDismissed(dismissedPacket);
+                        await _client.OnRoomDismissedAsync(dismissedPacket);
                     }
                     // 处理房间信息查询结果
                     else if (packet is RoomInfoQueryResultPacket infoQueryResultPacket)
                     {
-                        _client.OnRoomInfoQueryResult(infoQueryResultPacket);
+                        await _client.OnRoomInfoQueryResultAsync(infoQueryResultPacket);
                     }
                     // 处理房间申请通知
                     else if (packet is RoomJoinRequestNoticePacket joinRequestNoticePacket)
                     {
-                        _client.OnRoomJoinRequestNotice(joinRequestNoticePacket);
+                        await _client.OnRoomJoinRequestNoticeAsync(joinRequestNoticePacket);
                     }
                     // 处理房间申请结果
                     else if (packet is RoomJoinResultPacket joinResultPacket)
                     {
-                        _client.OnRoomJoinResult(joinResultPacket);
+                        await _client.OnRoomJoinResultAsync(joinResultPacket);
                     }
                     // 处理房间聊天消息
                     else if (packet is RoomChatMessagePacket chatMsgPacket)
                     {
-                        _client.OnRoomChatMessageReceived(chatMsgPacket);
+                        await _client.OnRoomChatMessageReceivedAsync(chatMsgPacket);
                     }
                     // 处理用户信息查询结果
                     else if (packet is UserInfoResultPacket userInfoResultPacket)
                     {
-                        _client.OnUserInfoResultReceived(userInfoResultPacket);
+                        await _client.OnUserInfoResultReceivedAsync(userInfoResultPacket);
                     }
                     // 处理KeepAlive包
                     else if (packet is KeepAlivePacket keepAlivePacket)
                     {
-                        _client.OnKeepAliveReceived(keepAlivePacket);
+                        await _client.OnKeepAliveReceivedAsync(keepAlivePacket);
                     }
                     // 处理P2P连接请求通知
                     else if (packet is PeerConnectRequestNoticePacket peerConnectRequestPacket)
                     {
-                        _client.OnPeerConnectRequestReceived(peerConnectRequestPacket);
+                        await _client.OnPeerConnectRequestReceivedAsync(peerConnectRequestPacket);
                     }
                     // 处理P2P连接接受通知
                     else if (packet is PeerConnectAcceptNoticePacket peerConnectAcceptPacket)
                     {
-                        _client.OnPeerConnectAcceptReceived(peerConnectAcceptPacket);
+                        await _client.OnPeerConnectAcceptReceivedAsync(peerConnectAcceptPacket);
                     }
                     // 处理P2P连接拒绝通知
                     else if (packet is PeerConnectRejectNoticePacket peerConnectRejectPacket)
                     {
-                        _client.OnPeerConnectRejectReceived(peerConnectRejectPacket);
+                        await _client.OnPeerConnectRejectReceivedAsync(peerConnectRejectPacket);
                     }
                     // 处理P2P IP信息包
                     else if (packet is PeerIPInfoPacket peerIPInfoPacket)
                     {
-                        _client.OnPeerIPInfoReceived(peerIPInfoPacket);
+                        await _client.OnPeerIPInfoReceivedAsync(peerIPInfoPacket);
                     }
                     // 处理P2P连接成功包
                     else if (packet is PeerConnectSuccessPacket peerConnectSuccessPacket)
                     {
-                        _client.OnPeerConnectSuccessReceived(peerConnectSuccessPacket);
+                        await _client.OnPeerConnectSuccessReceivedAsync(peerConnectSuccessPacket);
                     }
                     // 处理P2P连接失败包
                     else if (packet is PeerConnectFailedNoticePacket peerConnectFailedPacket)
                     {
-                        _client.OnPeerConnectFailedReceived(peerConnectFailedPacket);
+                        await _client.OnPeerConnectFailedReceivedAsync(peerConnectFailedPacket);
                     }
                 }
             }
