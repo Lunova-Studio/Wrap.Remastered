@@ -7,16 +7,17 @@ namespace Wrap.Remastered.Commands.Client;
 public class RoomCommand : CommandBase, ICommandTabCompleter
 {
     private readonly WrapClient _client;
+    private readonly string[] _subCommands = new[] { "create", "join", "leave", "kick", "info", "approve", "reject", "transfer", "dismiss", "list", "chat" };
     public RoomCommand(WrapClient client) { _client = client; }
     public override string GetName() => "room";
     public override string GetDescription() => "房间相关操作 (create/join/leave/kick/info)";
-    public override string GetUsage() => "room <create|join|leave|kick|info> ...";
+    public override string GetUsage() => $"room <{string.Join("|", _subCommands)}> ...";
 
     public override async Task OnExecuteAsync(string[] args)
     {
         if (args.Length == 0)
         {
-            ConsoleWriter.WriteLineFormatted("§c用法: room <create|join|leave|kick|info> ...");
+            ConsoleWriter.WriteLineFormatted($"§c用法: room <{string.Join("|", _subCommands)}> ...");
             return;
         }
         var sub = args[0].ToLower();
@@ -194,7 +195,7 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
         var list = new List<string>();
         if (args.Length == 1)
         {
-            list.AddRange(new[] { "create", "join", "leave", "kick", "info", "approve", "reject", "transfer", "dismiss", "list", "chat" });
+            list.AddRange(_subCommands);
             list = list.Where(x => x.StartsWith(args[0])).ToList();
         }
         else if (args.Length == 2 && _client.CurrentRoomInfo != null)

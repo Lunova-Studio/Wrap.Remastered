@@ -64,9 +64,6 @@ public class WrapClient : IWrapClient, IDisposable
     public event EventHandler<string>? PeerConnectionClosed;
     public event EventHandler<(string targetUserId, string reason)>? PeerConnectionFailed;
 
-    // 保留业务事件（如RoomInfoReceived、PeerConnectRequestReceived、PeerConnectionEstablished等），不再传递日志字符串。
-    // 所有原 LogMessage?.Invoke(this, "xxx") 相关代码全部删除。
-
     // NAT类型检测相关
     public NatType CurrentNatType { get; private set; } = NatType.Unknown;
     public IPEndPoint? PublicEndPoint { get; private set; }
@@ -95,6 +92,7 @@ public class WrapClient : IWrapClient, IDisposable
     public event EventHandler<IClientBoundPacket>? PacketReceived;
     public event EventHandler<UserInfo>? LoggedIn;
     public event EventHandler<Network.Protocol.ClientBound.PluginMessagePacket>? PluginMessageReceived;
+    public event EventHandler<string>? ServerMessageReceived;
 
     public IPEndPoint? RemoteIP { get; set; }
 
@@ -870,6 +868,11 @@ public class WrapClient : IWrapClient, IDisposable
     internal async Task OnPluginMessageReceivedAsync(Network.Protocol.ClientBound.PluginMessagePacket pluginMessagePacket)
     {
         PluginMessageReceived?.Invoke(this, pluginMessagePacket);
+    }
+
+    internal async Task OnServerMessageReceivedAsync(ServerMessagePacket serverMessagePacket)
+    {
+        ServerMessageReceived?.Invoke(this, serverMessagePacket.Message);
     }
 }
 

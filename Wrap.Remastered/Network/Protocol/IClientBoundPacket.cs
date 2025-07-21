@@ -24,7 +24,8 @@ public interface IClientBoundPacket : IPacket
         { ClientBoundPacketType.PeerConnectRejectNoticePacket, new PeerConnectRejectNoticePacketSerializer() },
         { ClientBoundPacketType.PeerIPInfoPacket, new PeerIPInfoPacketSerializer() },
         { ClientBoundPacketType.PeerConnectFailedNoticePacket, new PeerConnectFailedNoticePacketSerializer() },
-        { ClientBoundPacketType.PluginMessage, new PluginMessagePacketSerializer() }
+        { ClientBoundPacketType.PluginMessage, PluginMessagePacketSerializer.Instance },
+        { ClientBoundPacketType.ServerMessagePacket, ServerMessagePacket.Serializer }
     };
 
     ClientBoundPacketType GetPacketType();

@@ -199,6 +199,11 @@ public class ClientHandler : ChannelHandlerAdapter
                     {
                         await _client.OnPluginMessageReceivedAsync(pluginMessagePacket);
                     }
+                    // 处理服务器消息包
+                    else if (packet is ServerMessagePacket serverMessagePacket)
+                    {
+                        await _client.OnServerMessageReceivedAsync(serverMessagePacket);
+                    }
                 }
             }
         }

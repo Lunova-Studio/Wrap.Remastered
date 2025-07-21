@@ -1,5 +1,6 @@
 using ConsoleInteractive;
 using Wrap.Remastered.Interfaces;
+using Wrap.Remastered.Network.Protocol.ClientBound;
 
 namespace Wrap.Remastered.Commands.Server;
 
@@ -30,9 +31,8 @@ public class BroadcastCommand : CommandBase
         }
 
         var message = string.Join(" ", args);
-        var messageData = System.Text.Encoding.UTF8.GetBytes(message);
 
-        var successCount = await _server.GetConnectionManager().BroadcastToUsersAsync(messageData);
+        var successCount = await _server.GetConnectionManager().BroadcastToAllAsync(new ServerMessagePacket(message));
 
         ConsoleWriter.WriteLineFormatted($"§a广播消息已发送给 {successCount} 个用户");
         ConsoleWriter.WriteLineFormatted($"§f消息内容: {message}");

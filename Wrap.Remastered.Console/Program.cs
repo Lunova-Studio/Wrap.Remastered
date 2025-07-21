@@ -134,6 +134,9 @@ class Program
             {
                 ConsoleWriter.WriteLineFormatted($"§e[代理] 代理转发功能已禁用");
             };
+            client.ServerMessageReceived += (sender, msg) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§a[服务器消息] §e {msg}");
 
             // 注册命令输入处理（支持Tab补全）
             ConsoleReader.MessageReceived += (sender, command) =>

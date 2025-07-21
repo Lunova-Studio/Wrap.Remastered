@@ -316,4 +316,6 @@ public interface IConnectionManager
     ChannelConnection? GetChannelConnection(IChannel channel);
 
     ChannelConnection? GetUserConnection(string userId);
+    Task<int> BroadcastToAllAsync(IClientBoundPacket packet);
+    Task<int> BroadcastToUsersAsync(IClientBoundPacket packet, string? excludeUserId = null);
 }

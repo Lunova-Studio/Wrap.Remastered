@@ -19,5 +19,6 @@ public enum ClientBoundPacketType
     PeerConnectRejectNoticePacket,
     PeerIPInfoPacket,
     PeerConnectFailedNoticePacket,
-    PluginMessage
+    PluginMessage,
+    ServerMessagePacket
 }
