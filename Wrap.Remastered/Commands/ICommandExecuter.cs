@@ -27,5 +27,5 @@ public interface ICommandExecuter
     /// 执行命令
     /// </summary>
     /// <param name="args">命令参数</param>
-    void OnExecute(string[] args);
+    Task OnExecuteAsync(string[] args);
 } 

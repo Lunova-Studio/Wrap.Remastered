@@ -9,7 +9,7 @@ namespace Wrap.Remastered.Network.Protocol.PeerBound;
 public class ProxyConnectPacket : IPeerBoundPacket
 {
     public static ISerializer<IPacket> Serializer { get; } = new ProxyConnectPacketSerializer();
-    
+
     /// <summary>
     /// 连接ID
     /// </summary>
@@ -58,4 +58,4 @@ public class ProxyConnectPacketSerializer : ISerializer<IPacket>
 
         return stream.ToArray();
     }
-} 
+}

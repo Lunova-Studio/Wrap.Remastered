@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using ConsoleInteractive;
 
 namespace Wrap.Remastered.Commands;
@@ -76,7 +73,7 @@ public class CommandManager
     public IList<string> Complete(string command, string[] args)
     {
         var completer = FindTabCompleter(command);
-        if (completer == null) 
+        if (completer == null)
             return new List<string>();
 
         return completer.OnComplete(args);
@@ -121,7 +118,7 @@ public class CommandManager
 
         try
         {
-            executor.OnExecute(args);
+            executor.OnExecuteAsync(args).Wait();
         }
         catch (Exception ex)
         {
@@ -208,4 +205,4 @@ public class CommandManager
 
         return parts.ToArray();
     }
-} 
+}

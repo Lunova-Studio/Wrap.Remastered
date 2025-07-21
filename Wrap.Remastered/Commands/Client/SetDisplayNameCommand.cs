@@ -17,7 +17,7 @@ public class SetDisplayNameCommand : CommandBase
     public override string GetDescription() => "设置本地显示名称";
     public override string GetUsage() => "setdisplayname <显示名称>";
 
-    public override void OnExecute(string[] args)
+    public override async Task OnExecuteAsync(string[] args)
     {
         if (args.Length < 1)
         {

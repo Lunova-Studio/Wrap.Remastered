@@ -292,7 +292,7 @@ public class DotNettyConnectionManager : IConnectionManager, IDisposable
         var results = await Task.WhenAll(tasks);
         return results.Count(x => x);
     }
-    public async Task<int> BroadcastToAllAsync(IClientBoundPacket packet, string? excludeUserId = null)
+    public async Task<int> BroadcastToAllAsync(IClientBoundPacket packet)
     {
         CheckDisposed();
 

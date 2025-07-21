@@ -1,4 +1,3 @@
-using System;
 using ConsoleInteractive;
 using Wrap.Remastered.Interfaces;
 
@@ -22,33 +21,21 @@ public class StopCommand : CommandBase
 
     public override string GetUsage() => "stop";
 
-    public override void OnExecute(string[] args)
+    public override async Task OnExecuteAsync(string[] args)
     {
         ConsoleWriter.WriteLineFormatted("§e正在优雅地关闭服务器...");
-        
+
         try
         {
-            // 异步关闭服务器
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    // 关闭服务器
-                    await _server.StopAsync();
-                    ConsoleWriter.WriteLineFormatted("§a服务器已成功关闭");
-                    
-                    // 等待一小段时间让日志输出完成
-                    await Task.Delay(1000);
-                    
-                    // 然后退出程序
-                    Environment.Exit(0);
-                }
-                catch (Exception ex)
-                {
-                    ConsoleWriter.WriteLineFormatted($"§c关闭服务器时发生错误: {ex.Message}");
-                    Environment.Exit(1);
-                }
-            });
+            // 关闭服务器
+            await _server.StopAsync();
+            ConsoleWriter.WriteLineFormatted("§a服务器已成功关闭");
+
+            // 等待一小段时间让日志输出完成
+            await Task.Delay(1000);
+
+            // 然后退出程序
+            Environment.Exit(0);
         }
         catch (Exception ex)
         {
@@ -56,4 +43,4 @@ public class StopCommand : CommandBase
             Environment.Exit(1);
         }
     }
-} 
+}

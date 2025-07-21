@@ -24,7 +24,8 @@ public interface IServerBoundPacket : IPacket
         { ServerBoundPacketType.PeerConnectAcceptPacket, new PeerConnectAcceptPacketSerializer() },
         { ServerBoundPacketType.PeerConnectRejectPacket, new PeerConnectRejectPacketSerializer() },
         { ServerBoundPacketType.PeerConnectFailedPacket, new PeerConnectFailedPacketSerializer() },
-        { ServerBoundPacketType.PeerConnectSuccessPacket, new PeerConnectSuccessPacketSerializer() }
+        { ServerBoundPacketType.PeerConnectSuccessPacket, new PeerConnectSuccessPacketSerializer() },
+        { ServerBoundPacketType.PluginMessage, new PluginMessagePacketSerializer() }
     };
 
     ServerBoundPacketType GetPacketType();

@@ -25,7 +25,7 @@ public class StatusCommand : CommandBase
 
     public override string GetUsage() => "status";
 
-    public override void OnExecute(string[] args)
+    public override async Task OnExecuteAsync(string[] args)
     {
         var stats = _server.GetConnectionManager().GetStatistics();
         var process = Process.GetCurrentProcess();

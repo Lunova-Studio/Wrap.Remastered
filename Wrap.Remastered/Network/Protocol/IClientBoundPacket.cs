@@ -1,11 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Wrap.Remastered.Interfaces;
+﻿using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol.ClientBound;
-using Wrap.Remastered.Network.Protocol.ServerBound;
 
 namespace Wrap.Remastered.Network.Protocol;
 
@@ -29,7 +23,9 @@ public interface IClientBoundPacket : IPacket
         { ClientBoundPacketType.PeerConnectAcceptNoticePacket, new PeerConnectAcceptNoticePacketSerializer() },
         { ClientBoundPacketType.PeerConnectRejectNoticePacket, new PeerConnectRejectNoticePacketSerializer() },
         { ClientBoundPacketType.PeerIPInfoPacket, new PeerIPInfoPacketSerializer() },
-        { ClientBoundPacketType.PeerConnectFailedNoticePacket, new PeerConnectFailedNoticePacketSerializer() }
+        { ClientBoundPacketType.PeerConnectFailedNoticePacket, new PeerConnectFailedNoticePacketSerializer() },
+        { ClientBoundPacketType.PluginMessage, new PluginMessagePacketSerializer() },
+        { ClientBoundPacketType.ServerMessagePacket, new ServerMessagePacketSerializer() }
     };
 
     ClientBoundPacketType GetPacketType();

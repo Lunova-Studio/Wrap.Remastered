@@ -25,7 +25,7 @@ public class KickCommand : CommandBase, ICommandTabCompleter
 
     public override string GetUsage() => "kick <用户ID> [原因]";
 
-    public override void OnExecute(string[] args)
+    public override async Task OnExecuteAsync(string[] args)
     {
         if (args.Length == 0)
         {
@@ -35,7 +35,7 @@ public class KickCommand : CommandBase, ICommandTabCompleter
 
         var userId = args[0];
         var reason = args.Length > 1 ? string.Join(" ", args.Skip(1)) : "被管理员踢出";
-        var success = _server.GetConnectionManager().DisconnectUserAsync(userId, reason).GetAwaiter().GetResult();
+        var success = await _server.GetConnectionManager().DisconnectUserAsync(userId, reason);
 
         if (success)
         {

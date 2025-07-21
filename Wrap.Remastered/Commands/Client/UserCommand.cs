@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using Wrap.Remastered.Client;
 using ConsoleInteractive;
+using Wrap.Remastered.Client;
 
 namespace Wrap.Remastered.Commands.Client;
 
@@ -13,7 +13,7 @@ public class UserCommand : CommandBase, ICommandTabCompleter
     public override string GetDescription() => "查询用户信息";
     public override string GetUsage() => "user <用户ID>";
 
-    public override void OnExecute(string[] args)
+    public override async Task OnExecuteAsync(string[] args)
     {
         if (args.Length < 1)
         {
@@ -26,7 +26,7 @@ public class UserCommand : CommandBase, ICommandTabCompleter
             ConsoleWriter.WriteLineFormatted("§c用户ID不能为空");
             return;
         }
-        _client.QueryUserInfo(userId);
+        await _client.QueryUserInfoAsync(userId);
         ConsoleWriter.WriteLineFormatted($"§a已发送用户信息查询请求: {userId}");
     }
 

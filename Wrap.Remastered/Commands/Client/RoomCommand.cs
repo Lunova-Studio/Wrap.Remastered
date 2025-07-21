@@ -7,16 +7,17 @@ namespace Wrap.Remastered.Commands.Client;
 public class RoomCommand : CommandBase, ICommandTabCompleter
 {
     private readonly WrapClient _client;
+    private readonly string[] _subCommands = new[] { "create", "join", "leave", "kick", "info", "approve", "reject", "transfer", "dismiss", "list", "chat" };
     public RoomCommand(WrapClient client) { _client = client; }
     public override string GetName() => "room";
     public override string GetDescription() => "房间相关操作 (create/join/leave/kick/info)";
-    public override string GetUsage() => "room <create|join|leave|kick|info> ...";
+    public override string GetUsage() => $"room <{string.Join("|", _subCommands)}> ...";
 
-    public override void OnExecute(string[] args)
+    public override async Task OnExecuteAsync(string[] args)
     {
         if (args.Length == 0)
         {
-            ConsoleWriter.WriteLineFormatted("§c用法: room <create|join|leave|kick|info> ...");
+            ConsoleWriter.WriteLineFormatted($"§c用法: room <{string.Join("|", _subCommands)}> ...");
             return;
         }
         var sub = args[0].ToLower();
@@ -31,7 +32,7 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                 var name = args[1];
                 int max = 10;
                 if (args.Length > 2 && int.TryParse(args[2], out var m)) max = m;
-                _client.SendPacket(new RoomCreateRequestPacket(name, max));
+                await _client.SendPacketAsync(new RoomCreateRequestPacket(name, max));
                 ConsoleWriter.WriteLineFormatted($"§a已发送创建房间请求: {name} 最大人数: {max}");
                 break;
             case "join":
@@ -40,7 +41,7 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                     ConsoleWriter.WriteLineFormatted("§c用法: room join <房间ID>");
                     return;
                 }
-                _client.RequestJoinRoom(joinId);
+                await _client.RequestJoinRoomAsync(joinId);
                 ConsoleWriter.WriteLineFormatted($"§a已发送加入房间请求: {joinId}");
                 break;
             case "leave":
@@ -49,7 +50,7 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                     ConsoleWriter.WriteLineFormatted("§c你当前不在任何房间");
                     return;
                 }
-                _client.SendPacket(new RoomLeavePacket(_client.CurrentRoomInfo.RoomId));
+                await _client.SendPacketAsync(new RoomLeavePacket(_client.CurrentRoomInfo.RoomId));
                 ConsoleWriter.WriteLineFormatted($"§a已发送退出房间请求: {_client.CurrentRoomInfo.RoomId}");
                 break;
             case "kick":
@@ -68,7 +69,7 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                     ConsoleWriter.WriteLineFormatted("§c只有房主才能踢人");
                     return;
                 }
-                _client.KickUserFromRoom(_client.CurrentRoomInfo.RoomId, args[1]);
+                await _client.KickUserFromRoomAsync(_client.CurrentRoomInfo.RoomId, args[1]);
                 ConsoleWriter.WriteLineFormatted($"§a已发送踢人请求: {args[1]}");
                 break;
             case "info":
@@ -77,7 +78,7 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                     ConsoleWriter.WriteLineFormatted("§c用法: room info <房间ID>");
                     return;
                 }
-                _client.SendPacket(new RoomInfoQueryPacket(infoId));
+                await _client.SendPacketAsync(new RoomInfoQueryPacket(infoId));
                 ConsoleWriter.WriteLineFormatted($"§a已发送房间信息查询请求: {infoId}");
                 break;
             case "approve":
@@ -96,7 +97,7 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                     ConsoleWriter.WriteLineFormatted("§c只有房主才能审批入群请求");
                     return;
                 }
-                _client.ApproveJoinRoom(_client.CurrentRoomInfo.RoomId, args[1]);
+                await _client.ApproveJoinRoomAsync(_client.CurrentRoomInfo.RoomId, args[1]);
                 ConsoleWriter.WriteLineFormatted($"§a已同意用户加入: {args[1]}");
                 break;
             case "reject":
@@ -115,7 +116,7 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                     ConsoleWriter.WriteLineFormatted("§c只有房主才能审批入群请求");
                     return;
                 }
-                _client.RejectJoinRoom(_client.CurrentRoomInfo.RoomId, args[1]);
+                await _client.RejectJoinRoomAsync(_client.CurrentRoomInfo.RoomId, args[1]);
                 ConsoleWriter.WriteLineFormatted($"§a已拒绝用户加入: {args[1]}");
                 break;
             case "transfer":
@@ -134,7 +135,7 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                     ConsoleWriter.WriteLineFormatted("§c只有房主才能转让房主");
                     return;
                 }
-                _client.TransferRoomOwner(_client.CurrentRoomInfo.RoomId, args[1]);
+                await _client.TransferRoomOwnerAsync(_client.CurrentRoomInfo.RoomId, args[1]);
                 ConsoleWriter.WriteLineFormatted($"§a已发送房主转让请求: {args[1]}");
                 break;
             case "dismiss":
@@ -148,7 +149,7 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                     ConsoleWriter.WriteLineFormatted("§c只有房主才能解散房间");
                     return;
                 }
-                _client.DismissRoom(_client.CurrentRoomInfo.RoomId);
+                await _client.DismissRoomAsync(_client.CurrentRoomInfo.RoomId);
                 ConsoleWriter.WriteLineFormatted($"§a已发送解散房间请求: {_client.CurrentRoomInfo.RoomId}");
                 break;
             case "list":
@@ -181,7 +182,7 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
                     ConsoleWriter.WriteLineFormatted("§c消息不能为空");
                     return;
                 }
-                _client.SendPacket(new RoomChatPacket(_client.CurrentRoomInfo.RoomId, msg));
+                await _client.SendPacketAsync(new RoomChatPacket(_client.CurrentRoomInfo.RoomId, msg));
                 break;
             default:
                 ConsoleWriter.WriteLineFormatted("§c未知子命令: " + sub);
@@ -194,7 +195,7 @@ public class RoomCommand : CommandBase, ICommandTabCompleter
         var list = new List<string>();
         if (args.Length == 1)
         {
-            list.AddRange(new[] { "create", "join", "leave", "kick", "info", "approve", "reject", "transfer", "dismiss", "list", "chat" });
+            list.AddRange(_subCommands);
             list = list.Where(x => x.StartsWith(args[0])).ToList();
         }
         else if (args.Length == 2 && _client.CurrentRoomInfo != null)

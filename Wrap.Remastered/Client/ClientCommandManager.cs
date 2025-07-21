@@ -2,7 +2,6 @@ using System;
 using ConsoleInteractive;
 using Wrap.Remastered.Commands;
 using Wrap.Remastered.Commands.Client;
-using Wrap.Remastered.Client;
 using DotNetty.Common.Concurrency;
 
 namespace Wrap.Remastered.Client;

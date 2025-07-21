@@ -22,7 +22,7 @@ public class HelpCommand : CommandBase, ICommandTabCompleter
 
     public override string GetUsage() => "help [命令名]";
 
-    public override void OnExecute(string[] args)
+    public override async Task OnExecuteAsync(string[] args)
     {
         if (args.Length == 0)
         {

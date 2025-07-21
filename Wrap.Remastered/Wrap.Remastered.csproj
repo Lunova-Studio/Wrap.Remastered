@@ -19,7 +19,6 @@
 
   <ItemGroup>
     <Folder Include="Server\" />
-    <Folder Include="Schemas\" />
   </ItemGroup>
 
   <ItemGroup>

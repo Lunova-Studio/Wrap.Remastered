@@ -112,10 +112,13 @@ public class LoggingService : IDisposable
         commandManager.RegisterCommandExecuter(new Commands.Server.KickCommand(_server));
         commandManager.RegisterCommandExecuter(new Commands.Server.BroadcastCommand(_server));
         commandManager.RegisterCommandExecuter(new Commands.Server.StopCommand(_server));
+        commandManager.RegisterCommandExecuter(new Commands.Server.SendMessageCommand(_server));
 
         // 注册标签页补全器
         commandManager.RegisterCommandTabCompleter(new Commands.Server.HelpCommand(_server));
         commandManager.RegisterCommandTabCompleter(new Commands.Server.KickCommand(_server));
+        commandManager.RegisterCommandTabCompleter(new Commands.Server.BroadcastCommand(_server));
+        commandManager.RegisterCommandTabCompleter(new Commands.Server.SendMessageCommand(_server));
     }
 
     /// <summary>

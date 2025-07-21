@@ -1,4 +1,3 @@
-using System;
 using ConsoleInteractive;
 using Wrap.Remastered.Client;
 
@@ -22,17 +21,19 @@ public class DisconnectCommand : CommandBase
 
     public override string GetUsage() => "disconnect";
 
-    public override void OnExecute(string[] args)
+    public override async Task OnExecuteAsync(string[] args)
     {
         try
         {
             ConsoleWriter.WriteLineFormatted("§e正在断开连接...");
-            _client.DisconnectAsync().Wait();
+            await Task.Run(() => _client.Dispose());
             ConsoleWriter.WriteLineFormatted("§a已断开连接");
+
+            Environment.Exit(0);
         }
         catch (Exception ex)
         {
             ConsoleWriter.WriteLineFormatted($"§c断开连接失败: {ex.Message}");
         }
     }
-} 
+}

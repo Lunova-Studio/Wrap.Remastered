@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using ConsoleInteractive;
-using Wrap.Remastered.Client;
 using Wrap.Remastered.Schemas;
+using System.Threading.Tasks;
+using Wrap.Remastered.Client;
 
 namespace Wrap.Remastered.Commands.Client;
 
@@ -24,9 +25,9 @@ public class ConnectCommand : CommandBase, ICommandTabCompleter
 
     public override string GetUsage() => "connect [服务器地址] [端口]";
 
-    public override void OnExecute(string[] args)
+    public override async Task OnExecuteAsync(string[] args)
     {
-        string address = "127.0.0.1";
+        string address = "srv.mcocet.top";
         int port = 10270;
 
         if (args.Length >= 1)
@@ -60,9 +61,7 @@ public class ConnectCommand : CommandBase, ICommandTabCompleter
             // 注册登录成功事件
             _client.LoggedIn += OnLoggedIn;
 
-#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
-            _client.ConnectAsync(address, port).Wait();
-#pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
+            await _client.ConnectAsync(address, port);
 
             ConsoleWriter.WriteLineFormatted($"§a连接成功！正在发送登录请求...");
             
@@ -74,9 +73,7 @@ public class ConnectCommand : CommandBase, ICommandTabCompleter
                 DisplayName = profile.DisplayName
             };
 
-#pragma warning disable VSTHRD002 // Avoid problematic synchronous waits
-            _client.SendLoginPacketAsync(userInfo).Wait();
-#pragma warning restore VSTHRD002 // Avoid problematic synchronous waits
+            await _client.SendLoginPacketAsync(userInfo);
         }
         catch (Exception ex)
         {
@@ -97,7 +94,7 @@ public class ConnectCommand : CommandBase, ICommandTabCompleter
     {
         if (args.Length == 1)
         {
-            return new List<string> { "127.0.0.1", "localhost", "0.0.0.0" };
+            return new List<string> { "srv.mcocet.top", "127.0.0.1", "localhost", "0.0.0.0" };
         }
 
         if (args.Length == 2)
