@@ -1,5 +1,15 @@
+<p align="center">
+<img src="hhttps://lunova.studio/wp-content/uploads/2025/07/Wrap-Remastered-scaled.png" alt="pARPxN8.png" border="0" />
+</p>
+
+<div align="center">
+
 # Wrap.Remastered
 
+由 Lunova Studio 开发的
+高可用性 Wrap 联机核心组件
+
+</div>
 ## 🚀 快速开始
 
 ### 构建项目
@@ -23,7 +33,7 @@ cd Wrap.Remastered.Console
 dotnet run
 ```
 
-### Docker 部署
+### Docker 部署 (🚩推荐)
 ```bash
 # 构建镜像
 docker build -t wrap-remastered-server -f Wrap.Remastered.Server/Dockerfile .

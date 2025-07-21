@@ -10,7 +10,7 @@ public class ClientConfiguration
     /// <summary>
     /// 服务器地址
     /// </summary>
-    public string ServerAddress { get; set; } = "127.0.0.1";
+    public string ServerAddress { get; set; } = "wrap.api.lunova.studio";
 
     /// <summary>
     /// 服务器端口
