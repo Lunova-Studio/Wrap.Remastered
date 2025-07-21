@@ -30,13 +30,13 @@ jobs:
       run: dotnet build Wrap.Remastered.Console/Wrap.Remastered.Console.csproj --configuration Debug --no-restore
 
     - name: Upload Server Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: server
         path: Wrap.Remastered.Server/bin/Debug/net8.0
 
     - name: Upload Console Client Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: console-client
-        path: Wrap.Remastered.Console/bin/Debug/net8.0 
+        path: Wrap.Remastered.Console/bin/Debug/net8.0
