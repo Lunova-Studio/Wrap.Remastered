@@ -79,11 +79,9 @@ public class LocalProxyServer : IDisposable
         try
         {
             _listener = new TcpListener(IPAddress.Any, LocalPort);
-            ConsoleWriter.WriteLine($"[本地代理] 本地代理服务器初始化完成，监听端口: {LocalPort}");
         }
         catch (Exception ex)
         {
-            ConsoleWriter.WriteLine($"[本地代理] 初始化失败: {ex.Message}");
             throw;
         }
 
@@ -104,13 +102,10 @@ public class LocalProxyServer : IDisposable
         {
             _listener.Start();
             _isRunning = true;
-            ConsoleWriter.WriteLine($"[本地代理] 本地代理服务器已启动，监听端口: {LocalPort}");
-            ConsoleWriter.WriteLine($"[本地代理] 转发目标: {TargetAddress}:{TargetPort}");
             _ = Task.Run(() => ListenForConnectionsAsync());
         }
         catch (Exception ex)
         {
-            ConsoleWriter.WriteLine($"[本地代理] 启动失败: {ex.Message}");
             throw;
         }
     }
@@ -127,11 +122,10 @@ public class LocalProxyServer : IDisposable
         try
         {
             _listener?.Stop();
-            ConsoleWriter.WriteLine("[本地代理] 本地代理服务器已停止");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ConsoleWriter.WriteLine($"[本地代理] 停止时出错: {ex.Message}");
+
         }
 
         // 关闭所有连接
@@ -154,12 +148,9 @@ public class LocalProxyServer : IDisposable
                 var client = await _listener!.AcceptTcpClientAsync();
                 await HandleLocalConnectionAsync(client);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                if (_isRunning && !_disposed)
-                {
-                    ConsoleWriter.WriteLine($"[本地代理] 接受连接时出错: {ex.Message}");
-                }
+
             }
         }
     }
@@ -177,12 +168,9 @@ public class LocalProxyServer : IDisposable
             // 检查连接数量限制
             if (_connections.Count >= MaxConnections)
             {
-                ConsoleWriter.WriteLine($"[本地代理] 连接数量已达上限 ({MaxConnections})，拒绝新连接");
                 client.Close();
                 return;
             }
-
-            ConsoleWriter.WriteLine($"[本地代理] 接受本地连接: {connectionId}");
 
             var connectionInfo = new LocalProxyConnectionInfo
             {
@@ -198,19 +186,12 @@ public class LocalProxyServer : IDisposable
             var ownerUserId = GetOwnerUserId();
             if (!string.IsNullOrEmpty(ownerUserId))
             {
-                ConsoleWriter.WriteLine($"[本地代理] 添加连接映射: {connectionId} -> {ownerUserId}");
                 _connectionMapping.AddMapping(connectionId, ownerUserId);
-            }
-            else
-            {
-                ConsoleWriter.WriteLine($"[本地代理] 警告: 无法获取房主用户ID");
             }
 
             // 向房主发送代理连接请求
             var connectPacket = new ProxyConnectPacket(connectionId);
             await _client.SendPeerPacketAsync(ownerUserId ?? connectionId, connectPacket);
-
-            ConsoleWriter.WriteLine($"[本地代理] 已发送代理连接请求: {connectionId} -> {TargetAddress}:{TargetPort}");
 
             // 启动同步转发线程
             StartSyncForwarding(connectionInfo);
@@ -219,7 +200,6 @@ public class LocalProxyServer : IDisposable
         }
         catch (Exception ex)
         {
-            ConsoleWriter.WriteLine($"[本地代理] 处理本地连接时出错: {connectionId}, 错误: {ex.Message}");
             client.Close();
         }
     }
@@ -239,13 +219,11 @@ public class LocalProxyServer : IDisposable
 
         if (success)
         {
-            ConsoleWriter.WriteLine($"[本地代理] 代理连接建立成功: {connectionId}");
             // 设置连接状态为活跃
             _connectionMapping.SetConnectionStatus(connectionId, true);
         }
         else
         {
-            ConsoleWriter.WriteLine($"[本地代理] 代理连接建立失败: {connectionId}, 错误: {errorMessage}");
             // 设置连接状态为非活跃
             _connectionMapping.SetConnectionStatus(connectionId, false);
             await CloseLocalConnectionAsync(connectionId, "连接建立失败");
@@ -253,7 +231,7 @@ public class LocalProxyServer : IDisposable
     }
 
     // 同步从本地客户端转发数据到房主
-    private void ForwardDataFromLocalSync(LocalProxyConnectionInfo connectionInfo)
+    private void ForwardDataFromLocal(LocalProxyConnectionInfo connectionInfo)
     {
         var buffer = new byte[65536];
         while (connectionInfo.IsConnected && !_disposed)
@@ -266,7 +244,6 @@ public class LocalProxyServer : IDisposable
             }
             catch (Exception ex)
             {
-                ConsoleWriter.WriteLine($"[本地代理] 本地流读取异常 Conn={connectionInfo.ConnectionId} ex={ex.Message}");
                 break;
             }
             if (bytesRead == 0)
@@ -279,14 +256,13 @@ public class LocalProxyServer : IDisposable
             {
                 var seq = System.Threading.Interlocked.Increment(ref connectionInfo.SequenceIdCounter);
                 var dataPacket = new ProxyDataPacket(connectionInfo.ConnectionId, buffer.Take(bytesRead).ToArray(), true, seq);
-                _client.PeerConnectionManager.SendPacketAsync(ownerUserId, dataPacket);
-                ConsoleWriter.WriteLine($"[代理] 本地->P2P 读取到包 Conn={connectionInfo.ConnectionId} Size={bytesRead}");
+                _client.PeerConnectionManager.SendPacket(ownerUserId, dataPacket);
             }
         }
     }
 
     // 同步处理P2P->本地的数据
-    public void HandleProxyDataSync(string connectionId, ProxyDataPacket packet)
+    public void HandleProxyData(string connectionId, ProxyDataPacket packet)
     {
         byte[] data = packet.Data;
         if (!_connections.TryGetValue(connectionId, out var connectionInfo))
@@ -304,7 +280,7 @@ public class LocalProxyServer : IDisposable
             {
                 connectionInfo.LocalStream.Write(data, 0, data.Length);
                 connectionInfo.LocalStream.Flush();
-                ConsoleWriter.WriteLine($"[代理] P2P->本地 写入包 Conn={connectionInfo.ConnectionId} Size={data.Length}");
+
                 LocalDataTransferred?.Invoke(this, (connectionId, data.Length));
                 _connectionMapping.UpdateActivity(connectionInfo.ConnectionId);
                 _connectionMapping.UpdateBytesTransferred(connectionInfo.ConnectionId, data.Length);
@@ -320,7 +296,7 @@ public class LocalProxyServer : IDisposable
     // 启动同步转发线程
     public void StartSyncForwarding(LocalProxyConnectionInfo connectionInfo)
     {
-        new Thread(() => ForwardDataFromLocalSync(connectionInfo)) { IsBackground = true }.Start();
+        new Thread(() => ForwardDataFromLocal(connectionInfo)) { IsBackground = true }.Start();
     }
 
     /// <summary>
@@ -335,12 +311,9 @@ public class LocalProxyServer : IDisposable
             return;
         }
 
-        ConsoleWriter.WriteLine($"[本地代理] 关闭本地连接: {connectionId}, 原因: {reason}");
-
         // 先从字典中移除连接，防止重复关闭
         _connections.Remove(connectionId);
         _connectionMapping.RemoveMapping(connectionId);
-        ConsoleWriter.WriteLine($"[本地代理] 连接已从字典中移除: {connectionId}, 剩余连接数: {_connections.Count}");
 
         try
         {
@@ -348,9 +321,9 @@ public class LocalProxyServer : IDisposable
             connectionInfo.LocalStream?.Close();
             connectionInfo.LocalClient?.Close();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ConsoleWriter.WriteLine($"[本地代理] 关闭本地连接时出错: {connectionId}, 错误: {ex.Message}");
+
         }
         finally
         {
@@ -387,11 +360,6 @@ public class LocalProxyServer : IDisposable
 
         // 同时清理映射中的过期连接
         _connectionMapping.CleanupExpiredMappings(TimeSpan.FromSeconds(ConnectionTimeout));
-
-        if (expiredConnections.Count > 0)
-        {
-            ConsoleWriter.WriteLine($"[本地代理] 清理了 {expiredConnections.Count} 个过期连接");
-        }
     }
 
     /// <summary>
@@ -499,13 +467,10 @@ public class LocalProxyServer : IDisposable
 
         _disposed = true;
 
-        ConsoleWriter.WriteLine("[本地代理] 正在关闭本地代理服务器...");
-
         _cleanupTimer?.Dispose();
 
         // 关闭所有连接
         var connectionIds = _connections.Keys.ToList();
-        ConsoleWriter.WriteLine($"[本地代理] 正在关闭 {connectionIds.Count} 个活跃连接...");
 
         foreach (var connectionId in connectionIds)
         {
@@ -520,7 +485,5 @@ public class LocalProxyServer : IDisposable
 
         // 清理映射
         _connectionMapping?.Dispose();
-
-        ConsoleWriter.WriteLine("[本地代理] 本地代理服务器已关闭");
     }
 }

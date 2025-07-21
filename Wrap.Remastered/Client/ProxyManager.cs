@@ -86,10 +86,7 @@ public class ProxyManager : IDisposable
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         
-        // 启动清理定时器（每30秒检查一次）
         _cleanupTimer = new Timer(CleanupExpiredConnections, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
-        
-        ConsoleWriter.WriteLine("[代理] 代理管理器已启动");
     }
 
     /// <summary>
@@ -105,14 +102,12 @@ public class ProxyManager : IDisposable
             // 检查连接数量限制
             if (_connections.Count >= MaxConnections)
             {
-                ConsoleWriter.WriteLine($"[代理] 连接数量已达上限 ({MaxConnections})，拒绝新连接: {connectionId}");
                 return false;
             }
             
             // 检查连接是否已存在
             if (_connections.ContainsKey(connectionId))
             {
-                ConsoleWriter.WriteLine($"[代理] 连接ID已存在: {connectionId}");
                 return false;
             }
             
@@ -143,9 +138,8 @@ public class ProxyManager : IDisposable
             
             return true;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ConsoleWriter.WriteLine($"[代理] 建立代理连接失败: {connectionId}, 错误: {ex.Message}");
             return false;
         }
     }
@@ -160,13 +154,11 @@ public class ProxyManager : IDisposable
     {
         if (!_connections.TryGetValue(connectionId, out var connectionInfo))
         {
-            ConsoleWriter.WriteLine($"[代理] 连接不存在: {connectionId}");
             return;
         }
         
         if (!connectionInfo.IsConnected)
         {
-            ConsoleWriter.WriteLine($"[代理] 连接已断开: {connectionId}");
             return;
         }
         
@@ -184,7 +176,6 @@ public class ProxyManager : IDisposable
         }
         catch (Exception ex)
         {
-            ConsoleWriter.WriteLine($"[代理] 处理代理数据时出错: {connectionId}, 错误: {ex.Message}");
             await CloseProxyConnectionAsync(connectionId, "数据传输错误");
         }
     }
@@ -201,12 +192,9 @@ public class ProxyManager : IDisposable
             return;
         }
         
-        ConsoleWriter.WriteLine($"[代理] 关闭代理连接: {connectionId}, 原因: {reason}");
-        
         // 先从字典中移除连接，防止重复关闭
         _connections.Remove(connectionId);
         _connectionMapping.RemoveMapping(connectionId);
-        ConsoleWriter.WriteLine($"[代理] 连接已从字典中移除: {connectionId}, 剩余连接数: {_connections.Count}");
         
         try
         {
@@ -220,9 +208,8 @@ public class ProxyManager : IDisposable
             connectionInfo.TargetStream?.Close();
             connectionInfo.TargetClient?.Close();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ConsoleWriter.WriteLine($"[代理] 关闭代理连接时出错: {connectionId}, 错误: {ex.Message}");
         }
         finally
         {
@@ -248,31 +235,26 @@ public class ProxyManager : IDisposable
             }
             catch (Exception ex)
             {
-                ConsoleWriter.WriteLine($"[代理] 目标服务器流读取异常 Conn={connectionInfo.ConnectionId} ex={ex.Message}");
                 break;
             }
             if (bytesRead == 0)
             {
-                ConsoleWriter.WriteLine($"[代理] 目标服务器流断开 Conn={connectionInfo.ConnectionId} readCount={readCount}");
                 CloseProxyConnectionSync(connectionInfo.ConnectionId, "目标服务器流断开");
                 break;
             }
             readCount++;
-            ConsoleWriter.WriteLine($"[代理] 目标->P2P 读取到包 Conn={connectionInfo.ConnectionId} Size={bytesRead} readCount={readCount}");
             // 立即向peer发包（同步）
             var userId = _connectionMapping.GetUserId(connectionInfo.ConnectionId);
             if (!string.IsNullOrEmpty(userId))
             {
                 var seq = ++connectionInfo.SequenceIdCounter;
                 var packet = new ProxyDataPacket(connectionInfo.ConnectionId, buffer.Take(bytesRead).ToArray(), false, seq);
-                ConsoleWriter.WriteLine($"[代理] 目标->P2P 发送包 Conn={connectionInfo.ConnectionId} Seq={seq} Size={bytesRead}");
                 try
                 {
-                    _client.PeerConnectionManager.SendPacketAsync(userId, packet);
+                    _client.PeerConnectionManager.SendPacket(userId, packet);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    ConsoleWriter.WriteLine($"[代理] 目标->P2P 发送包异常 Conn={connectionInfo.ConnectionId} ex={ex.Message}");
                 }
             }
         }
@@ -290,10 +272,8 @@ public class ProxyManager : IDisposable
             {
                 long seq = packet.SequenceId;
                 buffer[seq] = (packet.Data, packet.IsClientToServer, seq);
-                ConsoleWriter.WriteLine($"[P2P] 入队包 Seq={seq} Conn={connectionInfo.ConnectionId}");
                 if (buffer.Count > MAX_BUFFER_SIZE)
                 {
-                    ConsoleWriter.WriteLine($"[P2P] buffer溢出，主动断开连接: {connectionInfo.ConnectionId}");
                     CloseProxyConnectionSync(connectionInfo.ConnectionId, "乱序缓存溢出");
                     return;
                 }
@@ -309,7 +289,6 @@ public class ProxyManager : IDisposable
                     {
                         connectionInfo.TargetStream.Write(next.Data, 0, next.Data.Length);
                         connectionInfo.TargetStream.Flush();
-                        ConsoleWriter.WriteLine($"[P2P] Peer->Target 写入包 Conn={connectionInfo.ConnectionId} Seq={lastSeq + 1} Size={next.Data.Length}");
                     }
                     finally
                     {
@@ -336,7 +315,6 @@ public class ProxyManager : IDisposable
             catch { }
             _connections.Remove(connectionId);
             _connectionMapping.RemoveMapping(connectionId);
-            ConsoleWriter.WriteLine($"[代理] 关闭连接 Conn={connectionId} 原因={reason}");
         }
     }
 
@@ -369,11 +347,6 @@ public class ProxyManager : IDisposable
         
         // 同时清理映射中的过期连接
         _connectionMapping.CleanupExpiredMappings(TimeSpan.FromSeconds(ConnectionTimeout));
-        
-        if (expiredConnections.Count > 0)
-        {
-            ConsoleWriter.WriteLine($"[代理] 清理了 {expiredConnections.Count} 个过期连接");
-        }
     }
 
     /// <summary>
@@ -466,13 +439,10 @@ public class ProxyManager : IDisposable
         
         _disposed = true;
         
-        ConsoleWriter.WriteLine("[代理] 正在关闭代理管理器...");
-        
         _cleanupTimer?.Dispose();
         
         // 关闭所有连接
         var connectionIds = _connections.Keys.ToList();
-        ConsoleWriter.WriteLine($"[代理] 正在关闭 {connectionIds.Count} 个活跃连接...");
         
         foreach (var connectionId in connectionIds)
         {
@@ -484,8 +454,6 @@ public class ProxyManager : IDisposable
         
         // 清理映射
         _connectionMapping?.Dispose();
-        
-        ConsoleWriter.WriteLine("[代理] 代理管理器已关闭");
     }
 
     // 启动同步转发线程

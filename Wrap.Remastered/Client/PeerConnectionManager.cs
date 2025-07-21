@@ -83,7 +83,6 @@ public class PeerConnectionManager : IDisposable
         // 验证心跳间隔在合理范围内（5-60秒）
         if (heartbeatInterval < 5 || heartbeatInterval > 60)
         {
-            ConsoleWriter.WriteLine($"[P2P] 警告: P2P心跳间隔 {heartbeatInterval}秒 超出合理范围(5-60秒)，使用默认值10秒");
             heartbeatInterval = 10;
         }
         
@@ -92,8 +91,6 @@ public class PeerConnectionManager : IDisposable
         
         // 启动心跳超时检查定时器（每5秒检查一次）
         _keepAliveTimeoutTimer = new Timer(CheckKeepAliveTimeouts, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
-        
-        ConsoleWriter.WriteLine($"[P2P] P2P心跳间隔设置为: {heartbeatInterval}秒");
     }
 
     /// <summary>
@@ -119,8 +116,6 @@ public class PeerConnectionManager : IDisposable
         // 启动数据接收任务
         _ = Task.Run(() => ReceiveDataAsync(connectionInfo));
         
-        ConsoleWriter.WriteLine($"[P2P] 添加与 {targetUserId} 的P2P连接");
-        
         // 触发连接事件
         PeerConnected?.Invoke(_client, targetUserId);
     }
@@ -133,13 +128,11 @@ public class PeerConnectionManager : IDisposable
     {
         if (string.IsNullOrEmpty(targetUserId))
         {
-            ConsoleWriter.WriteLine("[P2P] 警告: 尝试关闭空用户ID的连接");
             return;
         }
 
         if (_connections.TryGetValue(targetUserId, out var connectionInfo))
         {
-            ConsoleWriter.WriteLine($"[P2P] 正在关闭与 {targetUserId} 的P2P连接...");
             
             try
             {
@@ -160,22 +153,15 @@ public class PeerConnectionManager : IDisposable
                 // 从连接列表中移除
                 _connections.Remove(targetUserId);
                 
-                ConsoleWriter.WriteLine($"[P2P] 成功关闭与 {targetUserId} 的P2P连接");
-                
                 // 触发断开连接事件
                 PeerDisconnected?.Invoke(_client, targetUserId);
             }
             catch (Exception ex)
             {
-                ConsoleWriter.WriteLine($"[P2P] 关闭与 {targetUserId} 的连接时出错: {ex.Message}");
                 
                 // 即使出错也要从连接列表中移除
                 _connections.Remove(targetUserId);
             }
-        }
-        else
-        {
-            ConsoleWriter.WriteLine($"[P2P] 警告: 尝试关闭不存在的连接: {targetUserId}");
         }
     }
 
@@ -184,16 +170,12 @@ public class PeerConnectionManager : IDisposable
     /// </summary>
     public void CloseAllConnections()
     {
-        ConsoleWriter.WriteLine($"[P2P] 正在关闭所有P2P连接，共 {_connections.Count} 个连接...");
-        
         var connectionIds = _connections.Keys.ToList();
         
         foreach (var targetUserId in connectionIds)
         {
             CloseConnection(targetUserId);
         }
-        
-        ConsoleWriter.WriteLine("[P2P] 所有P2P连接已关闭");
     }
 
     /// <summary>
@@ -236,8 +218,6 @@ public class PeerConnectionManager : IDisposable
             connectionInfo.TcpClient?.Close();
             _connections.Remove(targetUserId);
             
-            ConsoleWriter.WriteLine($"[P2P] 移除与 {targetUserId} 的P2P连接");
-            
             // 触发断开连接事件
             PeerDisconnected?.Invoke(_client, targetUserId);
         }
@@ -270,7 +250,6 @@ public class PeerConnectionManager : IDisposable
     /// <param name="packet">数据包</param>
     public async Task SendPacketAsync(string targetUserId, IPeerBoundPacket packet)
     {
-        ConsoleWriter.WriteLine($"[P2P] SendPacketAsync packetType: {packet.GetPacketType()} to {targetUserId}");
         if (string.IsNullOrEmpty(targetUserId)) throw new ArgumentNullException(nameof(targetUserId));
         if (packet == null) throw new ArgumentNullException(nameof(packet));
 
@@ -300,11 +279,9 @@ public class PeerConnectionManager : IDisposable
                 await connectionInfo.WriteLock.WaitAsync();
                 try
                 {
-                    ConsoleWriter.WriteLine($"[P2P] Write to {targetUserId} type={packet.GetPacketType()} size={packetData.Length}");
                     connectionInfo.NetworkStream.WriteInt(packetData.Length);
                     await connectionInfo.NetworkStream.WriteAsync(packetData, 0, packetData.Length);
                     await connectionInfo.NetworkStream.FlushAsync();
-                    ConsoleWriter.WriteLine($"[P2P] Write to {targetUserId} finished type={packet.GetPacketType()} size={packetData.Length}");
                 }
                 finally
                 {
@@ -312,9 +289,8 @@ public class PeerConnectionManager : IDisposable
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ConsoleWriter.WriteLine($"[P2P] 向 {targetUserId} 发送数据包失败: {ex.Message}");
             RemoveConnection(targetUserId);
             throw;
         }
@@ -369,17 +345,14 @@ public class PeerConnectionManager : IDisposable
                     
                     // 发送心跳包
                     await SendPacketAsync(targetUserId, keepAlivePacket);
-                    
-                    ConsoleWriter.WriteLine($"[P2P] 已向 {targetUserId} 发送心跳包，期望响应值: {keepAlivePacket.Value}");
                 }
                 else
                 {
                     disconnectedUsers.Add(targetUserId);
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                ConsoleWriter.WriteLine($"[P2P] 向 {targetUserId} 发送心跳失败: {ex.Message}");
                 disconnectedUsers.Add(targetUserId);
             }
         }
@@ -411,9 +384,9 @@ public class PeerConnectionManager : IDisposable
                 await ProcessReceivedDataAsync(connectionInfo.TargetUserId, data);
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ConsoleWriter.WriteLine($"[P2P] 接收来自 {connectionInfo.TargetUserId} 的数据时出错: {ex.Message}");
+
         }
         finally
         {
@@ -432,7 +405,6 @@ public class PeerConnectionManager : IDisposable
         {
             if (data.Length < 4)
             {
-                ConsoleWriter.WriteLine($"[P2P] 收到来自 {targetUserId} 的数据包过短");
                 return;
             }
 
@@ -441,8 +413,6 @@ public class PeerConnectionManager : IDisposable
             var packetData = new byte[data.Length - 4];
             Array.Copy(data, 4, packetData, 0, packetData.Length);
 
-
-            ConsoleWriter.WriteLine($"[P2P] 收到来自 {targetUserId} 的数据包类型: {((PeerBoundPacketType)packetType).ToString()}");
             // 根据数据包类型处理
             switch ((PeerBoundPacketType)packetType)
             {
@@ -468,9 +438,8 @@ public class PeerConnectionManager : IDisposable
                     break;
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ConsoleWriter.WriteLine($"[P2P] 处理来自 {targetUserId} 的数据时出错: {ex.Message}");
         }
     }
 
@@ -486,20 +455,16 @@ public class PeerConnectionManager : IDisposable
             var serializer = new PeerKeepAlivePacketSerializer();
             var packet = (PeerKeepAlivePacket)serializer.Deserialize(packetData);
             
-            ConsoleWriter.WriteLine($"[P2P] 收到来自 {targetUserId} 的心跳包，值: {packet.Value}");
-            
             // 触发心跳事件
             PeerKeepAliveReceived?.Invoke(_client, (targetUserId, packet));
             
             // 发送心跳响应包
             var responsePacket = new PeerKeepAliveResponsePacket(packet.Value);
             await SendPacketAsync(targetUserId, responsePacket);
-            
-            ConsoleWriter.WriteLine($"[P2P] 已向 {targetUserId} 发送心跳响应包，值: {packet.Value}");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ConsoleWriter.WriteLine($"[P2P] 处理来自 {targetUserId} 的心跳包时出错: {ex.Message}");
+
         }
     }
 
@@ -515,8 +480,6 @@ public class PeerConnectionManager : IDisposable
             var serializer = new PeerKeepAliveResponsePacketSerializer();
             var packet = (PeerKeepAliveResponsePacket)serializer.Deserialize(packetData);
             
-            ConsoleWriter.WriteLine($"[P2P] 收到来自 {targetUserId} 的心跳响应包，值: {packet.Value}");
-            
             // 验证响应值
             var connectionInfo = GetConnection(targetUserId);
             if (connectionInfo != null && connectionInfo.ExpectedKeepAliveResponse.HasValue)
@@ -526,23 +489,17 @@ public class PeerConnectionManager : IDisposable
                     // 验证成功，更新最后心跳时间
                     connectionInfo.LastKeepAlive = DateTime.UtcNow;
                     connectionInfo.ExpectedKeepAliveResponse = null; // 清除期望值
-                    ConsoleWriter.WriteLine($"[P2P] 心跳验证成功: {targetUserId}");
                 }
                 else
                 {
                     // 验证失败，断开连接
-                    ConsoleWriter.WriteLine($"[P2P] 心跳验证失败: {targetUserId}，期望值: {connectionInfo.ExpectedKeepAliveResponse.Value}，实际值: {packet.Value}");
                     CloseConnection(targetUserId);
                 }
             }
-            else
-            {
-                ConsoleWriter.WriteLine($"[P2P] 收到来自 {targetUserId} 的意外心跳响应包");
-            }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ConsoleWriter.WriteLine($"[P2P] 处理来自 {targetUserId} 的心跳响应包时出错: {ex.Message}");
+
         }
     }
 
@@ -558,8 +515,6 @@ public class PeerConnectionManager : IDisposable
             var serializer = new ProxyConnectPacketSerializer();
             var packet = (ProxyConnectPacket)serializer.Deserialize(packetData);
             
-            ConsoleWriter.WriteLine($"[P2P] 收到来自 {targetUserId} 的代理连接请求: {packet.ConnectionId}");
-            
             // 转发给代理管理器处理
             if (_client is WrapClient wrapClient && wrapClient.ProxyManager != null)
             {
@@ -573,14 +528,13 @@ public class PeerConnectionManager : IDisposable
             }
             else
             {
-                ConsoleWriter.WriteLine($"[P2P] 代理管理器不可用，拒绝代理连接请求: {packet.ConnectionId}");
                 var responsePacket = new ProxyResponsePacket(packet.ConnectionId, false, "代理管理器不可用");
                 await SendPacketAsync(targetUserId, responsePacket);
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ConsoleWriter.WriteLine($"[P2P] 处理代理连接请求时出错: {ex.Message}");
+
         }
     }
 
@@ -623,9 +577,9 @@ public class PeerConnectionManager : IDisposable
             }
             // 否则为重复包，直接丢弃
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ConsoleWriter.WriteLine($"[P2P] 处理代理数据包时出错: {ex.Message}");
+
         }
     }
     // 新增：实际处理ProxyDataPacket的方法
@@ -638,8 +592,7 @@ public class PeerConnectionManager : IDisposable
         }
         else
         {
-            ConsoleWriter.WriteLine($"[代理] ProcessProxyDataPacketAsync");
-            _client.LocalProxyServer.HandleProxyDataSync(packet.ConnectionId, packet);
+            _client.LocalProxyServer.HandleProxyData(packet.ConnectionId, packet);
         }
     }
 
@@ -655,17 +608,15 @@ public class PeerConnectionManager : IDisposable
             var serializer = new ProxyDisconnectPacketSerializer();
             var packet = (ProxyDisconnectPacket)serializer.Deserialize(packetData);
             
-            ConsoleWriter.WriteLine($"[P2P] 收到来自 {targetUserId} 的代理断开连接包: {packet.ConnectionId}, 原因: {packet.Reason}");
-            
             // 转发给代理管理器处理
             if (_client is WrapClient wrapClient && wrapClient.ProxyManager != null)
             {
                 await wrapClient.ProxyManager.CloseProxyConnectionAsync(packet.ConnectionId, packet.Reason);
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ConsoleWriter.WriteLine($"[P2P] 处理代理断开连接包时出错: {ex.Message}");
+
         }
     }
 
@@ -681,8 +632,6 @@ public class PeerConnectionManager : IDisposable
             var serializer = new ProxyResponsePacketSerializer();
             var packet = (ProxyResponsePacket)serializer.Deserialize(packetData);
             
-            ConsoleWriter.WriteLine($"[P2P] 收到来自 {targetUserId} 的代理响应包: {packet.ConnectionId}, 成功: {packet.Success}");
-            
             // 转发给本地代理服务器处理
             if (_client is WrapClient wrapClient && wrapClient.LocalProxyServer != null)
             {
@@ -690,9 +639,9 @@ public class PeerConnectionManager : IDisposable
                     packet.ConnectionId, packet.Success, packet.ErrorMessage);
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ConsoleWriter.WriteLine($"[P2P] 处理代理响应包时出错: {ex.Message}");
+
         }
     }
 
@@ -744,15 +693,12 @@ public class PeerConnectionManager : IDisposable
     {
         if (intervalSeconds < 5 || intervalSeconds > 60)
         {
-            ConsoleWriter.WriteLine($"[P2P] 警告: 心跳间隔 {intervalSeconds}秒 超出合理范围(5-60秒)");
             return;
         }
 
         // 重新创建定时器
         _keepAliveTimer?.Dispose();
         _keepAliveTimer = new Timer(async (c) => SendKeepAliveToAllAsync(c), null, TimeSpan.FromSeconds(intervalSeconds), TimeSpan.FromSeconds(intervalSeconds));
-        
-        ConsoleWriter.WriteLine($"[P2P] P2P心跳间隔已调整为: {intervalSeconds}秒");
     }
 
     /// <summary>
@@ -774,7 +720,6 @@ public class PeerConnectionManager : IDisposable
             if (connectionInfo.ExpectedKeepAliveResponse.HasValue && 
                 (now - connectionInfo.LastSentKeepAlive).TotalSeconds > 15)
             {
-                ConsoleWriter.WriteLine($"[P2P] 心跳超时: {targetUserId}，最后发送时间: {connectionInfo.LastSentKeepAlive}");
                 timeoutUsers.Add(targetUserId);
             }
         }

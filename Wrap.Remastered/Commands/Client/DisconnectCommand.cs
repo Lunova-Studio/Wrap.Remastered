@@ -27,8 +27,10 @@ public class DisconnectCommand : CommandBase
         try
         {
             ConsoleWriter.WriteLineFormatted("§e正在断开连接...");
-            await _client.DisconnectAsync();
+            await Task.Run(() => _client.Dispose());
             ConsoleWriter.WriteLineFormatted("§a已断开连接");
+
+            Environment.Exit(0);
         }
         catch (Exception ex)
         {

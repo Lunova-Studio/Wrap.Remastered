@@ -36,8 +36,104 @@ class Program
             client.Connected += OnClientConnected;
             client.Disconnected += OnClientDisconnected;
             
-            // 注册P2P连接事件
-            client.PeerConnectRequestReceived += OnPeerConnectRequestReceived;
+            // 注册WrapClient业务事件，分别输出日志
+            client.RoomInfoReceived += (sender, packet) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§a[房间] 加入房间: {packet.RoomName} (ID: {packet.RoomId})，房主: {packet.Owner.DisplayName}，成员数: {packet.Users.Count}/{packet.MaxUsers}");
+            };
+            client.RoomOwnerChanged += (sender, packet) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§e[房间] 房主已变更，房间ID: {packet.RoomId}，新房主UserId: {packet.NewOwnerUserId}");
+            };
+            client.RoomDismissed += (sender, packet) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§c[房间] 房间已解散，房间ID: {packet.RoomId}");
+            };
+            client.RoomInfoQueryResultReceived += (sender, packet) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§b[房间] 查询结果：房间ID: {packet.RoomId}，名称: {packet.RoomName}，房主: {packet.OwnerUserId}，人数: {packet.UserCount}/{packet.MaxUsers}");
+            };
+            client.RoomJoinRequestNoticeReceived += (sender, packet) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§a[房间] 有用户申请加入房间，房间ID: {packet.RoomId}，申请者UserId: {packet.ApplicantUserId}");
+            };
+            client.RoomJoinResultReceived += (sender, packet) =>
+            {
+                if (!packet.Success && packet.Message.Contains("踢出"))
+                {
+                    ConsoleWriter.WriteLineFormatted($"§c[房间] 你被房主踢出了房间 (ID: {packet.RoomId})");
+                }
+                else
+                {
+                    ConsoleWriter.WriteLineFormatted($"§a[房间] 申请加入房间{packet.RoomId}结果: {(packet.Success ? "成功" : "失败")}，消息: {packet.Message}");
+                }
+            };
+            client.RoomKickResultReceived += (sender, packet) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§c[房间] 你被房主踢出了房间 (ID: {packet.RoomId})");
+            };
+            client.RoomChatMessageReceived += (sender, packet) =>
+            {
+                var time = packet.Timestamp.ToLocalTime().ToString("HH:mm:ss");
+                ConsoleWriter.WriteLineFormatted($"§b[{time}] §a{packet.SenderDisplayName}§f: {packet.Message}");
+            };
+            client.UserInfoResultReceived += (sender, packet) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§a用户信息: UserId={packet.UserInfo.UserId}, Name={packet.UserInfo.Name}, DisplayName={packet.UserInfo.DisplayName}");
+            };
+            client.KeepAliveReceived += (sender, packet) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§b[心跳] 收到心跳包，Value={packet.Value}");
+            };
+            client.PeerConnectRequestReceived += (sender, packet) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§a[P2P] 收到来自 {packet.RequesterDisplayName} 的P2P连接请求");
+            };
+            client.PeerConnectAcceptReceived += (sender, packet) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§a[P2P] {packet.AccepterDisplayName} 接受了你的P2P连接请求");
+            };
+            client.PeerConnectRejectReceived += (sender, packet) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§c[P2P] {packet.RejecterDisplayName} 拒绝了你的P2P连接请求，原因: {packet.Reason}");
+            };
+            client.PeerIPInfoReceived += (sender, packet) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§b[P2P] 收到 {packet.TargetUserId} 的IP信息，准备建立P2P连接");
+            };
+            client.PeerConnectSuccessReceived += (sender, packet) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§a[P2P] 与 {packet.TargetUserId} 的P2P连接建立成功");
+            };
+            client.PeerConnectFailedReceived += (sender, packet) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§c[P2P] 与 {packet.TargetUserId} 的P2P连接失败，原因: {packet.Reason}");
+            };
+            client.PeerDataSent += (sender, e) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§b[P2P] 已发送数据包到 {e.targetUserId}，类型: {e.packet.GetType().Name}");
+            };
+            client.PeerConnectionEstablished += (sender, userId) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§a[P2P] 与 {userId} 的P2P连接建立成功（事件）");
+            };
+            client.PeerConnectionFailed += (sender, e) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§c[P2P] 与 {e.targetUserId} 的P2P连接失败，原因: {e.reason}");
+            };
+            // 注册WrapClient新增的专用日志事件
+            client.NatTypeDetectedEvent += (sender, natType) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§b[NAT] NAT类型检测完成: {natType}");
+            };
+            client.ProxyManagerInitialized += (sender, msg) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§a[代理] 房主代理管理器已初始化");
+            };
+            client.ProxyForwardingDisabled += (sender, e) =>
+            {
+                ConsoleWriter.WriteLineFormatted($"§e[代理] 代理转发功能已禁用");
+            };
 
             // 注册命令输入处理（支持Tab补全）
             ConsoleReader.MessageReceived += (sender, command) =>
