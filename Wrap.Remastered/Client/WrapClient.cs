@@ -702,9 +702,9 @@ public class WrapClient : IWrapClient, IDisposable
             if (UPnPService != null)
             {
                 IPEndPoint endPoint = new(new IPAddress(new byte[] { 0, 0, 0, 0 }), Random.Shared.Next(1000, 65535));
-                UPnPService.AddPortMapping(endPoint.Port, SocketProtocol.UDP, endPoint.Port, "Wrap NAT test");
-                result = StunHelper.GetClassicStunResultAsync(endPoint).GetAwaiter().GetResult();
-                UPnPService.DeletePortMapping(endPoint.Port, SocketProtocol.UDP);
+                await UPnPService.AddPortMappingAsync(endPoint.Port, SocketProtocol.UDP, endPoint.Port, "Wrap NAT test");
+                result = await StunHelper.GetClassicStunResultAsync(endPoint);
+                await UPnPService.DeletePortMappingAsync(endPoint.Port, SocketProtocol.UDP);
             }
             else
                 result = await StunHelper.GetClassicStunResultAsync();

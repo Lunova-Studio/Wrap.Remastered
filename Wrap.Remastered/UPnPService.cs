@@ -47,7 +47,7 @@ public class UPnPService : IUPnPService
     public async Task DeletePortMappingAsync(IPAddress? NewRemoteHost, int NewExternalPort, IUPnPService.SocketProtocol NewProtocol)
     {
         await (await Service.GetServiceAsync()).InvokeAsync("DeletePortMapping", 3000,
-                new KeyValuePair<string, object>("NewRemoteHost", (NewRemoteHost is null) ? GetExternalIPAddress().ToString() : NewRemoteHost.ToString()),
+                new KeyValuePair<string, object>("NewRemoteHost", (NewRemoteHost is null) ? (await GetExternalIPAddressAsync()).ToString() : NewRemoteHost.ToString()),
                 new KeyValuePair<string, object>("NewExternalPort", NewExternalPort),
                 new KeyValuePair<string, object>("NewProtocol", NewProtocol.ToString()));
     }
