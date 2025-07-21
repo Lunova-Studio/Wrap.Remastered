@@ -1,5 +1,5 @@
 <p align="center">
-<img src="hhttps://lunova.studio/wp-content/uploads/2025/07/Wrap-Remastered-scaled.png" alt="pARPxN8.png" border="0" />
+<img src="https://lunova.studio/wp-content/uploads/2025/07/Wrap-Remastered-scaled.png" alt="pARPxN8.png" border="0" />
 </p>
 
 <div align="center">
@@ -10,6 +10,7 @@
 高可用性 Wrap 联机核心组件
 
 </div>
+
 ## 🚀 快速开始
 
 ### 构建项目
