@@ -19,7 +19,8 @@ class Program
             ConsoleReader.BeginReadThread();
 
             ConsoleWriter.WriteLineFormatted("§a=== Wrap.Remastered 客户端 ===");
-            IUPnPService? service = await UPnPHelper.LookUpUPnPDeviceAsync(TimeSpan.FromSeconds(30));
+            ConsoleWriter.WriteLineFormatted("§f开始查找UPnP设备 超时时间: 15s");
+            IUPnPService? service = await UPnPHelper.LookUpUPnPDeviceAsync(TimeSpan.FromSeconds(15));
             ConsoleWriter.WriteLineFormatted("§f输入 'help' 查看可用命令");
             ConsoleWriter.WriteLineFormatted("§f输入 'connect' 连接到服务器");
             ConsoleWriter.WriteLineFormatted("");
