@@ -3,10 +3,12 @@ using System.Threading.Tasks;
 using ConsoleInteractive;
 using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol.ClientBound;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Wrap.Remastered.Commands.Server;
 
-public class SendMessageCommand : CommandBase
+public class SendMessageCommand : CommandBase, ICommandTabCompleter
 {
     private readonly IWrapServer _server;
 
@@ -46,5 +48,17 @@ public class SendMessageCommand : CommandBase
             ConsoleWriter.WriteLineFormatted($"§a已向用户 {userId} 发送消息。");
         else
             ConsoleWriter.WriteLineFormatted($"§c消息发送失败。");
+    }
+
+    public IList<string> OnComplete(string[] args)
+    {
+        var list = new List<string>();
+        if (args.Length == 1)
+        {
+            // 补全所有在线用户ID
+            var connections = _server.GetConnectionManager().GetAllUserConnections();
+            list.AddRange(connections.Where(c => c.UserInfo != null).Select(c => c.UserInfo!.UserId));
+        }
+        return list;
     }
 }

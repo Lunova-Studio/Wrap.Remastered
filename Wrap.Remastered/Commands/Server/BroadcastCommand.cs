@@ -7,13 +7,18 @@ namespace Wrap.Remastered.Commands.Server;
 /// <summary>
 /// 广播命令
 /// </summary>
-public class BroadcastCommand : CommandBase
+public class BroadcastCommand : CommandBase, ICommandTabCompleter
 {
     private readonly IWrapServer _server;
 
     public BroadcastCommand(IWrapServer server)
     {
         _server = server ?? throw new ArgumentNullException(nameof(server));
+    }
+
+    public IList<string> OnComplete(string[] args)
+    {
+        return new List<string>();
     }
 
     public override string GetName() => "broadcast";
