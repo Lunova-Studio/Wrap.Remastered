@@ -30,7 +30,7 @@ public static class StunHelper
 
     public static async Task<IPEndPoint> GetRemoteIPAsync(Socket socket)
     {
-        using StunClient3489 stunClient = new(new((await Dns.GetHostAddressesAsync(STUNServer)).First(), 3478), (IPEndPoint)socket.LocalEndPoint!, new NoneUdpProxy(socket));
+        using StunClient3489 stunClient = new(new((await Dns.GetHostAddressesAsync(STUNServer)).First(), 3478), (IPEndPoint)socket.LocalEndPoint!, new NoneUdpProxy((IPEndPoint)socket.LocalEndPoint!));
         await stunClient.QueryAsync();
         return stunClient.State.PublicEndPoint!;
     }
