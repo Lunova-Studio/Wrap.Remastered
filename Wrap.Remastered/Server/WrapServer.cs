@@ -253,12 +253,12 @@ public class WrapServer : IWrapServer, IDisposable
                 }
             }
 
-            Console.WriteLine("服务器已停止");
+            ConsoleWriter.WriteLine("服务器已停止");
             ServerStopped?.Invoke(this, new ServerStoppedEventArgs());
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"停止服务器时发生错误: {ex.Message}");
+            ConsoleWriter.WriteLine($"停止服务器时发生错误: {ex.Message}");
             ServerStopped?.Invoke(this, new ServerStoppedEventArgs(ex.Message));
             throw;
         }
