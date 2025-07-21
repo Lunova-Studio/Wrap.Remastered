@@ -26,7 +26,7 @@ dotnet run
 ### Docker 部署
 ```bash
 # 构建镜像
-docker build -t wrap-remastered-server .
+docker build -t wrap-remastered-server -f Wrap.Remastered.Server/Dockerfile .
 
 # 运行容器
 docker run -p 10270:10270 wrap-remastered-server
