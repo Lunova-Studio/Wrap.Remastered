@@ -185,7 +185,7 @@ public class WrapServer : IWrapServer, IDisposable
 
         try
         {
-            Console.WriteLine("正在停止服务器...");
+            ConsoleWriter.WriteLine("正在停止服务器...");
 
             _isRunning = false;
 
@@ -225,7 +225,7 @@ public class WrapServer : IWrapServer, IDisposable
             {
                 try
                 {
-                    await _bossGroup.ShutdownGracefullyAsync(TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10));
+                    await _bossGroup.ShutdownGracefullyAsync(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
                 }
                 catch (Exception ex)
                 {
@@ -241,7 +241,7 @@ public class WrapServer : IWrapServer, IDisposable
             {
                 try
                 {
-                    await _workerGroup.ShutdownGracefullyAsync(TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10));
+                    await _workerGroup.ShutdownGracefullyAsync(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
                 }
                 catch (Exception ex)
                 {
