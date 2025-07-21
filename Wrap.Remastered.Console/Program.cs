@@ -138,6 +138,7 @@ class Program
             {
                 ConsoleWriter.WriteLineFormatted($"§a[服务器消息] §e {msg}");
             };
+            client.PeerConnectRequestReceived += OnPeerConnectRequestReceived;
             // 注册命令输入处理（支持Tab补全）
             ConsoleReader.MessageReceived += (sender, command) =>
             {
