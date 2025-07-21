@@ -27,7 +27,7 @@ public class ConnectCommand : CommandBase, ICommandTabCompleter
 
     public override async Task OnExecuteAsync(string[] args)
     {
-        string address = "127.0.0.1";
+        string address = "srv.mcocet.top";
         int port = 10270;
 
         if (args.Length >= 1)
@@ -94,7 +94,7 @@ public class ConnectCommand : CommandBase, ICommandTabCompleter
     {
         if (args.Length == 1)
         {
-            return new List<string> { "127.0.0.1", "localhost", "0.0.0.0" };
+            return new List<string> { "srv.mcocet.top", "127.0.0.1", "localhost", "0.0.0.0" };
         }
 
         if (args.Length == 2)
