@@ -215,6 +215,8 @@ public class WrapClient : IWrapClient, IDisposable
 
         try
         {
+            if (RemoteIP != null)
+                _ = UPnPService?.DeletePortMappingAsync(RemoteIP.Port, SocketProtocol.TCP);
             _isConnected = false;
             _isLoggedIn = false;
 
@@ -855,8 +857,6 @@ public class WrapClient : IWrapClient, IDisposable
 
             // 释放P2P连接管理器
             PeerConnectionManager?.Dispose();
-
-            UPnPService?.DeletePortMapping(RemoteIP.Port, SocketProtocol.TCP);
 
             // 异步断开连接，但不等待完成
             _ = DisconnectAsync();

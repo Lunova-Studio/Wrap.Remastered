@@ -26,7 +26,7 @@ public static class UPnPHelper
                 if (e.RemoteEndPoint.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork) return;
 
                 if (Searching)
-                    ConsoleWriter.WriteLine(device.FriendlyName);
+                    ConsoleWriter.WriteLine($"找到UPnP设备: {device.FriendlyName}");
                 UPnPDeviceLocations.Add(device);
             }
 
