@@ -6,6 +6,7 @@ using Wrap.Remastered.Network.Protocol;
 using Wrap.Remastered.Network.Protocol.ClientBound;
 using Wrap.Remastered.Network.Protocol.ServerBound;
 using Wrap.Remastered.Schemas;
+using PluginMessagePacket = Wrap.Remastered.Network.Protocol.ClientBound.PluginMessagePacket;
 
 namespace Wrap.Remastered.Client;
 
@@ -192,6 +193,11 @@ public class ClientHandler : ChannelHandlerAdapter
                     else if (packet is PeerConnectFailedNoticePacket peerConnectFailedPacket)
                     {
                         await _client.OnPeerConnectFailedReceivedAsync(peerConnectFailedPacket);
+                    }
+                    // 处理插件消息包
+                    else if (packet is PluginMessagePacket pluginMessagePacket)
+                    {
+                        await _client.OnPluginMessageReceivedAsync(pluginMessagePacket);
                     }
                 }
             }

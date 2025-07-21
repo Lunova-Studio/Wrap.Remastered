@@ -1,5 +1,4 @@
-﻿using ConsoleInteractive;
-using DotNetty.Buffers;
+﻿using DotNetty.Buffers;
 using DotNetty.Codecs;
 using DotNetty.Handlers.Logging;
 using DotNetty.Transport.Bootstrapping;
@@ -95,6 +94,7 @@ public class WrapClient : IWrapClient, IDisposable
     public event EventHandler<UnsolvedPacket>? DataReceived;
     public event EventHandler<IClientBoundPacket>? PacketReceived;
     public event EventHandler<UserInfo>? LoggedIn;
+    public event EventHandler<Network.Protocol.ClientBound.PluginMessagePacket>? PluginMessageReceived;
 
     public IPEndPoint? RemoteIP { get; set; }
 
@@ -865,6 +865,11 @@ public class WrapClient : IWrapClient, IDisposable
         {
             // 忽略断开连接时的错误
         }
+    }
+
+    internal async Task OnPluginMessageReceivedAsync(Network.Protocol.ClientBound.PluginMessagePacket pluginMessagePacket)
+    {
+        PluginMessageReceived?.Invoke(this, pluginMessagePacket);
     }
 }
 

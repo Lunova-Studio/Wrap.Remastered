@@ -1,9 +1,8 @@
-using ConsoleInteractive;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol.PeerBound;
-using System.Collections.Concurrent;
 
 namespace Wrap.Remastered.Client;
 
@@ -16,37 +15,37 @@ public class ProxyConnectionInfo
     /// 连接ID
     /// </summary>
     public string ConnectionId { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// 目标TCP客户端
     /// </summary>
     public TcpClient? TargetClient { get; set; }
-    
+
     /// <summary>
     /// 目标网络流
     /// </summary>
     public NetworkStream? TargetStream { get; set; }
-    
+
     /// <summary>
     /// 目标地址
     /// </summary>
     public string TargetAddress { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// 目标端口
     /// </summary>
     public int TargetPort { get; set; }
-    
+
     /// <summary>
     /// 连接状态
     /// </summary>
     public bool IsConnected => TargetClient?.Connected == true;
-    
+
     /// <summary>
     /// 创建时间
     /// </summary>
     public DateTime CreatedTime { get; set; } = DateTime.UtcNow;
-    
+
     /// <summary>
     /// 最后活动时间
     /// </summary>
@@ -70,13 +69,13 @@ public class ProxyManager : IDisposable
     private readonly IWrapClient _client;
     private readonly Timer _cleanupTimer;
     private bool _disposed = false;
-    
+
     // 代理配置
     public string DefaultTargetAddress { get; set; } = "127.0.0.1";
     public int DefaultTargetPort { get; set; } = 80;
     public int MaxConnections { get; set; } = 100;
     public int ConnectionTimeout { get; set; } = 300; // 5分钟
-    
+
     // 事件
     public event EventHandler<string>? ProxyConnectionEstablished;
     public event EventHandler<string>? ProxyConnectionClosed;
@@ -85,7 +84,7 @@ public class ProxyManager : IDisposable
     public ProxyManager(IWrapClient client)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
-        
+
         _cleanupTimer = new Timer(CleanupExpiredConnections, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
@@ -104,19 +103,19 @@ public class ProxyManager : IDisposable
             {
                 return false;
             }
-            
+
             // 检查连接是否已存在
             if (_connections.ContainsKey(connectionId))
             {
                 return false;
             }
-            
+
             // 创建到目标服务器的连接
             var targetClient = new TcpClient();
 
             var targetEndPoint = new IPEndPoint(IPAddress.Parse(_client.Profile.ProxyTargetAddress), _client.Profile.ProxyTargetPort);
             await targetClient.ConnectAsync(targetEndPoint);
-            
+
             var connectionInfo = new ProxyConnectionInfo
             {
                 ConnectionId = connectionId,
@@ -125,17 +124,17 @@ public class ProxyManager : IDisposable
                 TargetAddress = targetEndPoint.Address.ToString(),
                 TargetPort = targetEndPoint.Port
             };
-            
+
             _connections[connectionId] = connectionInfo;
-            
+
             // 添加连接映射
             _connectionMapping.AddMapping(connectionId, userId);
-            
+
             // 启动同步转发线程
             StartSyncForwarding(connectionInfo);
-            
+
             ProxyConnectionEstablished?.Invoke(this, connectionId);
-            
+
             return true;
         }
         catch (Exception)
@@ -156,19 +155,19 @@ public class ProxyManager : IDisposable
         {
             return;
         }
-        
+
         if (!connectionInfo.IsConnected)
         {
             return;
         }
-        
+
         try
         {
             connectionInfo.LastActivity = DateTime.UtcNow;
-            
+
             // peer->目标服务器方向：入队，由专用线程写入
             connectionInfo.PeerToTargetQueue.Enqueue(packet);
-            
+
             // 统计
             ProxyDataTransferred?.Invoke(this, (connectionId, packet.Data.Length));
             _connectionMapping.UpdateActivity(connectionId);
@@ -191,11 +190,11 @@ public class ProxyManager : IDisposable
         {
             return;
         }
-        
+
         // 先从字典中移除连接，防止重复关闭
         _connections.Remove(connectionId);
         _connectionMapping.RemoveMapping(connectionId);
-        
+
         try
         {
             // 关闭peer->目标服务器写入线程
@@ -324,27 +323,27 @@ public class ProxyManager : IDisposable
     private void CleanupExpiredConnections(object? state)
     {
         if (_disposed) return;
-        
+
         var expiredConnections = new List<string>();
         var now = DateTime.UtcNow;
-        
+
         foreach (var kvp in _connections)
         {
             var connectionId = kvp.Key;
             var connectionInfo = kvp.Value;
-            
+
             // 检查连接超时
             if ((now - connectionInfo.LastActivity).TotalSeconds > ConnectionTimeout)
             {
                 expiredConnections.Add(connectionId);
             }
         }
-        
+
         foreach (var connectionId in expiredConnections)
         {
             _ = CloseProxyConnectionAsync(connectionId, "连接超时");
         }
-        
+
         // 同时清理映射中的过期连接
         _connectionMapping.CleanupExpiredMappings(TimeSpan.FromSeconds(ConnectionTimeout));
     }
@@ -362,9 +361,9 @@ public class ProxyManager : IDisposable
             MaxConnections = MaxConnections,
             ConnectionTimeout = ConnectionTimeout
         };
-        
+
         var proxyMappingStats = _connectionMapping.GetMappingStatistics();
-        
+
         return new ProxyManagerStats
         {
             DefaultTargetAddress = DefaultTargetAddress,
@@ -373,7 +372,7 @@ public class ProxyManager : IDisposable
             MappingStats = proxyMappingStats
         };
     }
-    
+
 
 
     /// <summary>
@@ -436,22 +435,22 @@ public class ProxyManager : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        
+
         _disposed = true;
-        
+
         _cleanupTimer?.Dispose();
-        
+
         // 关闭所有连接
         var connectionIds = _connections.Keys.ToList();
-        
+
         foreach (var connectionId in connectionIds)
         {
             _ = CloseProxyConnectionAsync(connectionId, "代理管理器关闭");
         }
-        
+
         // 等待一小段时间让连接关闭完成
         Thread.Sleep(100);
-        
+
         // 清理映射
         _connectionMapping?.Dispose();
     }
@@ -462,4 +461,4 @@ public class ProxyManager : IDisposable
         new Thread(() => ForwardDataFromTargetSync(connectionInfo)) { IsBackground = true }.Start();
         new Thread(() => PeerToTargetWriterSync(connectionInfo)) { IsBackground = true }.Start();
     }
-} 
+}

@@ -1,4 +1,3 @@
-using System;
 using ConsoleInteractive;
 using Wrap.Remastered.Client;
 
@@ -37,4 +36,4 @@ public class DisconnectCommand : CommandBase
             ConsoleWriter.WriteLineFormatted($"§c断开连接失败: {ex.Message}");
         }
     }
-} 
+}

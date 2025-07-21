@@ -1,4 +1,3 @@
-using ConsoleInteractive;
 using Wrap.Remastered.Extensions;
 using Wrap.Remastered.Interfaces;
 
@@ -63,4 +62,4 @@ public class ProxyDataPacketSerializer : ISerializer<IPacket>
         stream.WriteBool(packet.IsClientToServer);
         return stream.ToArray();
     }
-} 
+}

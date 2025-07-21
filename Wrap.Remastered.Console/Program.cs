@@ -35,7 +35,7 @@ class Program
             client.LoggedIn += OnClientLoggedIn;
             client.Connected += OnClientConnected;
             client.Disconnected += OnClientDisconnected;
-            
+
             // 注册WrapClient业务事件，分别输出日志
             client.RoomInfoReceived += (sender, packet) =>
             {
@@ -111,7 +111,7 @@ class Program
             };
             client.PeerDataSent += (sender, e) =>
             {
-                ConsoleWriter.WriteLineFormatted($"§b[P2P] 已发送数据包到 {e.targetUserId}，类型: {e.packet.GetType().Name}");
+
             };
             client.PeerConnectionEstablished += (sender, userId) =>
             {
@@ -202,7 +202,7 @@ class Program
         ConsoleWriter.WriteLineFormatted($"§a登录成功！服务器分配的用户ID: {userInfo.UserId}");
         ConsoleWriter.WriteLineFormatted($"§f用户名: {userInfo.DisplayName}");
     }
-    
+
     /// <summary>
     /// P2P连接请求事件处理
     /// </summary>

@@ -24,5 +24,6 @@ public interface IPeerBoundPacket : IPacket
         { PeerBoundPacketType.ProxyDataPacket, new ProxyDataPacketSerializer() },
         { PeerBoundPacketType.ProxyDisconnectPacket, new ProxyDisconnectPacketSerializer() },
         { PeerBoundPacketType.ProxyResponsePacket, new ProxyResponsePacketSerializer() },
+        { PeerBoundPacketType.PluginMessage, new PluginMessagePacketSerializer() }
     };
 }

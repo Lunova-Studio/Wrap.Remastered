@@ -1,12 +1,8 @@
-using ConsoleInteractive;
-using DotNetty.Common;
-using System.Net;
 using System.Net.Sockets;
 using Wrap.Remastered.Extensions;
 using Wrap.Remastered.Interfaces;
 using Wrap.Remastered.Network.Protocol;
 using Wrap.Remastered.Network.Protocol.PeerBound;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Wrap.Remastered.Client;
 
@@ -19,32 +15,32 @@ public class PeerConnectionInfo
     /// 目标用户ID
     /// </summary>
     public string TargetUserId { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// TCP客户端连接
     /// </summary>
     public TcpClient? TcpClient { get; set; }
-    
+
     /// <summary>
     /// 网络流
     /// </summary>
     public NetworkStream? NetworkStream { get; set; }
-    
+
     /// <summary>
     /// 连接状态
     /// </summary>
     public bool IsConnected => TcpClient?.Connected == true;
-    
+
     /// <summary>
     /// 最后心跳时间
     /// </summary>
     public DateTime LastKeepAlive { get; set; } = DateTime.UtcNow;
-    
+
     /// <summary>
     /// 期望的心跳响应值
     /// </summary>
     public int? ExpectedKeepAliveResponse { get; set; }
-    
+
     /// <summary>
     /// 最后发送心跳的时间
     /// </summary>
@@ -74,21 +70,21 @@ public class PeerConnectionManager : IDisposable
     public PeerConnectionManager(IWrapClient client)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
-        
+
         // 获取P2P心跳间隔配置，默认为10秒（与服务端保持一致）
-        var heartbeatInterval = client is WrapClient wrapClient && wrapClient.Profile != null 
-            ? wrapClient.Profile.PeerHeartbeatInterval 
+        var heartbeatInterval = client is WrapClient wrapClient && wrapClient.Profile != null
+            ? wrapClient.Profile.PeerHeartbeatInterval
             : 10;
-        
+
         // 验证心跳间隔在合理范围内（5-60秒）
         if (heartbeatInterval < 5 || heartbeatInterval > 60)
         {
             heartbeatInterval = 10;
         }
-        
+
         // 启动心跳定时器
         _keepAliveTimer = new Timer(async (c) => await SendKeepAliveToAllAsync(c), null, TimeSpan.FromSeconds(heartbeatInterval), TimeSpan.FromSeconds(heartbeatInterval));
-        
+
         // 启动心跳超时检查定时器（每5秒检查一次）
         _keepAliveTimeoutTimer = new Timer(CheckKeepAliveTimeouts, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
     }
@@ -112,10 +108,10 @@ public class PeerConnectionManager : IDisposable
         };
 
         _connections[targetUserId] = connectionInfo;
-        
+
         // 启动数据接收任务
         _ = Task.Run(() => ReceiveDataAsync(connectionInfo));
-        
+
         // 触发连接事件
         PeerConnected?.Invoke(_client, targetUserId);
     }
@@ -133,7 +129,7 @@ public class PeerConnectionManager : IDisposable
 
         if (_connections.TryGetValue(targetUserId, out var connectionInfo))
         {
-            
+
             try
             {
                 // 关闭网络流
@@ -142,23 +138,23 @@ public class PeerConnectionManager : IDisposable
                     connectionInfo.NetworkStream.Close();
                     connectionInfo.NetworkStream.Dispose();
                 }
-                
+
                 // 关闭TCP客户端
                 if (connectionInfo.TcpClient != null)
                 {
                     connectionInfo.TcpClient.Close();
                     connectionInfo.TcpClient.Dispose();
                 }
-                
+
                 // 从连接列表中移除
                 _connections.Remove(targetUserId);
-                
+
                 // 触发断开连接事件
                 PeerDisconnected?.Invoke(_client, targetUserId);
             }
             catch (Exception ex)
             {
-                
+
                 // 即使出错也要从连接列表中移除
                 _connections.Remove(targetUserId);
             }
@@ -171,7 +167,7 @@ public class PeerConnectionManager : IDisposable
     public void CloseAllConnections()
     {
         var connectionIds = _connections.Keys.ToList();
-        
+
         foreach (var targetUserId in connectionIds)
         {
             CloseConnection(targetUserId);
@@ -217,7 +213,7 @@ public class PeerConnectionManager : IDisposable
             connectionInfo.NetworkStream?.Close();
             connectionInfo.TcpClient?.Close();
             _connections.Remove(targetUserId);
-            
+
             // 触发断开连接事件
             PeerDisconnected?.Invoke(_client, targetUserId);
         }
@@ -338,11 +334,11 @@ public class PeerConnectionManager : IDisposable
                 {
                     // 创建心跳包
                     var keepAlivePacket = new PeerKeepAlivePacket();
-                    
+
                     // 设置期望的响应值
                     connectionInfo.ExpectedKeepAliveResponse = keepAlivePacket.Value;
                     connectionInfo.LastSentKeepAlive = DateTime.UtcNow;
-                    
+
                     // 发送心跳包
                     await SendPacketAsync(targetUserId, keepAlivePacket);
                 }
@@ -373,14 +369,14 @@ public class PeerConnectionManager : IDisposable
         try
         {
             var buffer = new byte[65536]; // 增加到64KB以支持更大的数据包
-            
+
             while (connectionInfo.IsConnected)
             {
                 if (connectionInfo.NetworkStream == null) break;
 
                 var bytesRead = connectionInfo.NetworkStream.ReadInt32();
                 var data = connectionInfo.NetworkStream.ReadBytes(bytesRead);
-                
+
                 await ProcessReceivedDataAsync(connectionInfo.TargetUserId, data);
             }
         }
@@ -454,10 +450,10 @@ public class PeerConnectionManager : IDisposable
         {
             var serializer = new PeerKeepAlivePacketSerializer();
             var packet = (PeerKeepAlivePacket)serializer.Deserialize(packetData);
-            
+
             // 触发心跳事件
             PeerKeepAliveReceived?.Invoke(_client, (targetUserId, packet));
-            
+
             // 发送心跳响应包
             var responsePacket = new PeerKeepAliveResponsePacket(packet.Value);
             await SendPacketAsync(targetUserId, responsePacket);
@@ -479,7 +475,7 @@ public class PeerConnectionManager : IDisposable
         {
             var serializer = new PeerKeepAliveResponsePacketSerializer();
             var packet = (PeerKeepAliveResponsePacket)serializer.Deserialize(packetData);
-            
+
             // 验证响应值
             var connectionInfo = GetConnection(targetUserId);
             if (connectionInfo != null && connectionInfo.ExpectedKeepAliveResponse.HasValue)
@@ -514,15 +510,15 @@ public class PeerConnectionManager : IDisposable
         {
             var serializer = new ProxyConnectPacketSerializer();
             var packet = (ProxyConnectPacket)serializer.Deserialize(packetData);
-            
+
             // 转发给代理管理器处理
             if (_client is WrapClient wrapClient && wrapClient.ProxyManager != null)
             {
                 var success = await wrapClient.ProxyManager.HandleProxyConnectRequestAsync(
                     packet.ConnectionId, targetUserId);
-                
+
                 // 发送响应包
-                var responsePacket = new ProxyResponsePacket(packet.ConnectionId, success, 
+                var responsePacket = new ProxyResponsePacket(packet.ConnectionId, success,
                     success ? "" : "连接建立失败");
                 await SendPacketAsync(targetUserId, responsePacket);
             }
@@ -607,7 +603,7 @@ public class PeerConnectionManager : IDisposable
         {
             var serializer = new ProxyDisconnectPacketSerializer();
             var packet = (ProxyDisconnectPacket)serializer.Deserialize(packetData);
-            
+
             // 转发给代理管理器处理
             if (_client is WrapClient wrapClient && wrapClient.ProxyManager != null)
             {
@@ -631,7 +627,7 @@ public class PeerConnectionManager : IDisposable
         {
             var serializer = new ProxyResponsePacketSerializer();
             var packet = (ProxyResponsePacket)serializer.Deserialize(packetData);
-            
+
             // 转发给本地代理服务器处理
             if (_client is WrapClient wrapClient && wrapClient.LocalProxyServer != null)
             {
@@ -666,12 +662,12 @@ public class PeerConnectionManager : IDisposable
     public Dictionary<string, object> GetKeepAliveStatus()
     {
         var status = new Dictionary<string, object>();
-        
+
         foreach (var kvp in _connections)
         {
             var targetUserId = kvp.Key;
             var connectionInfo = kvp.Value;
-            
+
             status[targetUserId] = new
             {
                 IsConnected = connectionInfo.IsConnected,
@@ -681,7 +677,7 @@ public class PeerConnectionManager : IDisposable
                 HasPendingKeepAlive = connectionInfo.ExpectedKeepAliveResponse.HasValue
             };
         }
-        
+
         return status;
     }
 
@@ -717,7 +713,7 @@ public class PeerConnectionManager : IDisposable
             var connectionInfo = kvp.Value;
 
             // 检查是否有未响应的心跳（超过15秒未响应）
-            if (connectionInfo.ExpectedKeepAliveResponse.HasValue && 
+            if (connectionInfo.ExpectedKeepAliveResponse.HasValue &&
                 (now - connectionInfo.LastSentKeepAlive).TotalSeconds > 15)
             {
                 timeoutUsers.Add(targetUserId);
@@ -748,4 +744,4 @@ public class PeerConnectionManager : IDisposable
 
         _connections.Clear();
     }
-} 
+}
