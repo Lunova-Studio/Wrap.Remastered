@@ -2,7 +2,7 @@ using ConsoleInteractive;
 using Warp.Client.Interfaces;
 using Wrap.Shared.Commands;
 using Wrap.Shared.Interfaces.Command;
-using Wrap.Shared.Network.Packets;
+using Wrap.Shared.Network.Packets.Server;
 
 namespace Wrap.ClientConsole.Commands;
 

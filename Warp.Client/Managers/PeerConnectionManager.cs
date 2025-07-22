@@ -4,8 +4,8 @@ using Warp.Client.Models;
 using Wrap.Shared.Enums;
 using Wrap.Shared.Extensions;
 using Wrap.Shared.Interfaces;
-using Wrap.Shared.Network.Packets;
-using Wrap.Shared.Network.Serializers;
+using Wrap.Shared.Network.Packets.Peer;
+using Wrap.Shared.Network.Serializers.Peer;
 
 namespace Warp.Client.Managers;
 
@@ -40,7 +40,7 @@ public class PeerConnectionManager : IDisposable {
         }
 
         // 启动心跳定时器
-        _keepAliveTimer = new Timer(async c => await SendKeepAliveToAllAsync(c), null, 
+        _keepAliveTimer = new Timer(async c => await SendKeepAliveToAllAsync(c), null,
             TimeSpan.FromSeconds(heartbeatInterval), TimeSpan.FromSeconds(heartbeatInterval));
 
         // 启动心跳超时检查定时器（每5秒检查一次）

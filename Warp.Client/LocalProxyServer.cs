@@ -3,7 +3,7 @@ using System.Net.Sockets;
 using Warp.Client.Interfaces;
 using Warp.Client.Managers;
 using Warp.Client.Models;
-using Wrap.Shared.Network.Packets;
+using Wrap.Shared.Network.Packets.Peer;
 
 namespace Warp.Client;
 

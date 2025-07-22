@@ -7,14 +7,14 @@ using DotNetty.Transport.Channels.Sockets;
 using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Net.Sockets;
-using Wrap.Remastered.Server.Models;
 using Wrap.Remastered.Server.Handlers;
 using Wrap.Remastered.Server.Interfaces;
 using Wrap.Remastered.Server.Managers;
+using Wrap.Remastered.Server.Models;
 using Wrap.Shared.Events;
 using Wrap.Shared.Interfaces;
 using Wrap.Shared.Managers;
-using Wrap.Shared.Network.Packets;
+using Wrap.Shared.Network.Packets.Client;
 
 namespace Wrap.Remastered.Server;
 
@@ -343,54 +343,6 @@ public sealed class ServerCoordinator : IServerCoordinator {
             }
         }
         ClientDisconnected?.Invoke(this, new ClientDisconnectedEventArgs(clientId));
-    }
-
-    /// <summary>
-    /// 输出统计信息
-    /// </summary>
-    private async Task OutputStatisticsAsync() {
-        while (!_statisticsCancellationTokenSource!.Token.IsCancellationRequested) {
-            try {
-                await Task.Delay(30000, _statisticsCancellationTokenSource.Token); // 30秒输出一次
-
-                if (_connectionManager != null) {
-                    var stats = _connectionManager.GetStatistics();
-                    ConsoleWriter.WriteLine($"统计信息 - 总连接: {stats.TotalConnections}, 用户连接: {stats.UserConnections}, 活跃: {stats.ActiveConnections}, 非活跃: {stats.InactiveConnections}");
-                }
-            } catch (OperationCanceledException) {
-                break;
-            } catch (Exception ex) {
-                ConsoleWriter.WriteLine($"输出统计信息时发生错误: {ex.Message}");
-            }
-        }
-    }
-
-    /// <summary>
-    /// 输出KeepAlive包
-    /// </summary>
-    private async Task OutputKeepAliveAsync() {
-        while (!_keepAliveCancellationTokenSource!.Token.IsCancellationRequested) {
-            try {
-                await Task.Delay(10000, _keepAliveCancellationTokenSource.Token); // 10秒发送一次
-
-                if (_connectionManager != null) {
-                    var keepAliveValue = _random.Next();
-                    var keepAlivePacket = new KeepAlivePacket(keepAliveValue);
-
-                    // 为每个连接设置期望的响应值
-                    var connections = _connectionManager.GetAllConnections().ToList();
-                    foreach (var connection in connections) {
-                        connection.SetExpectedKeepAliveValue(keepAliveValue);
-                    }
-
-                    await _connectionManager.BroadcastToUsersAsync(keepAlivePacket);
-                }
-            } catch (OperationCanceledException) {
-                break;
-            } catch (Exception ex) {
-                ConsoleWriter.WriteLine($"发送KeepAlive包时发生错误: {ex.Message}");
-            }
-        }
     }
 
     /// <summary>

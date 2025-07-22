@@ -2,6 +2,8 @@ using DotNetty.Transport.Channels;
 using Wrap.Remastered.Server.Interfaces;
 using Wrap.Remastered.Server.Managers;
 using Wrap.Shared.Network.Packets;
+using Wrap.Shared.Network.Packets.Client;
+using Wrap.Shared.Network.Packets.Server;
 
 namespace Wrap.Remastered.Server.Handlers.PacketHandlers;
 

@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
 using Wrap.Shared.Network;
-using Wrap.Shared.Network.Packets;
+using Wrap.Shared.Network.Packets.Client;
 
 namespace Wrap.Remastered.Server.Managers;
 

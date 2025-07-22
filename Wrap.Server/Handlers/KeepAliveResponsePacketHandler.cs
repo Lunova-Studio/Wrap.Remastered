@@ -2,6 +2,7 @@ using DotNetty.Transport.Channels;
 using Microsoft.Extensions.Logging;
 using Wrap.Remastered.Server.Interfaces;
 using Wrap.Shared.Network.Packets;
+using Wrap.Shared.Network.Packets.Server;
 
 namespace Wrap.Remastered.Server.Handlers.PacketHandlers;
 

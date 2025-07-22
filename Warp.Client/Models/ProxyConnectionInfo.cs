@@ -1,6 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Net.Sockets;
-using Wrap.Shared.Network.Packets;
+using Wrap.Shared.Network.Packets.Peer;
 
 namespace Warp.Client.Models;
 

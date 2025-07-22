@@ -5,6 +5,8 @@ using Wrap.Shared.Enums;
 using Wrap.Shared.Interfaces;
 using Wrap.Shared.Models;
 using Wrap.Shared.Network.Packets;
+using Wrap.Shared.Network.Packets.Client;
+using Wrap.Shared.Network.Packets.Server;
 
 namespace Warp.Client.Handlers;
 

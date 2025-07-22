@@ -1,5 +1,5 @@
 ﻿using Wrap.Shared.Enums;
-using Wrap.Shared.Network.Serializers;
+using Wrap.Shared.Network.Serializers.Client;
 
 namespace Wrap.Shared.Interfaces;
 

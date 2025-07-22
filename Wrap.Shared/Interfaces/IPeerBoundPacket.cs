@@ -1,5 +1,6 @@
 ﻿using Wrap.Shared.Enums;
-using Wrap.Shared.Network.Serializers;
+using Wrap.Shared.Network.Serializers.Client;
+using Wrap.Shared.Network.Serializers.Peer;
 
 namespace Wrap.Shared.Interfaces;
 

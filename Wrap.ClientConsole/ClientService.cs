@@ -4,7 +4,8 @@ using Warp.Client;
 using Warp.Client.Helpers;
 using Warp.Client.Interfaces;
 using Wrap.Shared.Models;
-using Wrap.Shared.Network.Packets;
+using Wrap.Shared.Network.Packets.Client;
+using Wrap.Shared.Network.Packets.Server;
 
 namespace Wrap.ClientConsole;
 

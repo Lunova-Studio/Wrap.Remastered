@@ -2,7 +2,7 @@
 using Wrap.Remastered.Server.Interfaces;
 using Wrap.Shared.Commands;
 using Wrap.Shared.Interfaces.Command;
-using Wrap.Shared.Network.Packets;
+using Wrap.Shared.Network.Packets.Client;
 
 namespace Wrap.Remastered.Server.Commands;
 
