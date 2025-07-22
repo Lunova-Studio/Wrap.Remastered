@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "Wrap.Remastered.Console": {
-      "commandName": "Project",
-      "nativeDebugging": true
-    }
-  }
-}
