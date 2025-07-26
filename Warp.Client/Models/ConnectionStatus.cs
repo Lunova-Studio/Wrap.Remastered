@@ -3,7 +3,8 @@
 /// <summary>
 /// P2P连接状态信息
 /// </summary>
-public record ConnectionStatus {
+public record ConnectionStatus
+{
     /// <summary>
     /// 是否已连接
     /// </summary>
@@ -53,22 +54,27 @@ public record ConnectionStatus {
     /// 获取连接状态描述
     /// </summary>
     /// <returns>状态描述</returns>
-    public string GetStatusDescription() {
-        if (!string.IsNullOrEmpty(Error)) {
+    public string GetStatusDescription()
+    {
+        if (!string.IsNullOrEmpty(Error))
+        {
             return $"错误: {Error}";
         }
 
-        if (!IsConnected) {
+        if (!IsConnected)
+        {
             return "未连接";
         }
 
         var status = "已连接";
 
-        if (HasPendingKeepAlive) {
+        if (HasPendingKeepAlive)
+        {
             status += " (等待心跳响应)";
         }
 
-        if (LatencyMs.HasValue) {
+        if (LatencyMs.HasValue)
+        {
             status += $" (延迟: {LatencyMs.Value}ms)";
         }
 
@@ -79,8 +85,10 @@ public record ConnectionStatus {
     /// 获取最后心跳时间的描述
     /// </summary>
     /// <returns>时间描述</returns>
-    public string GetLastKeepAliveDescription() {
-        if (LastKeepAlive == default) {
+    public string GetLastKeepAliveDescription()
+    {
+        if (LastKeepAlive == default)
+        {
             return "从未";
         }
 
@@ -91,5 +99,17 @@ public record ConnectionStatus {
             return $"{(int)timeSpan.TotalMinutes}分钟前";
         else
             return $"{(int)timeSpan.TotalHours} 小时前";
+    }
+
+    public TimeSpan GetPing()
+    {
+        if (IsConnected)
+        {
+            if (LastSentKeepAlive == default || LastKeepAlive == default)
+                return TimeSpan.Zero;
+            return LastKeepAlive - LastSentKeepAlive;
+        }
+
+        return TimeSpan.Zero;
     }
 }

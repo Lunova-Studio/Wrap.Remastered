@@ -2,11 +2,13 @@ using DotNetty.Transport.Channels;
 using Microsoft.Extensions.Logging;
 using Wrap.Remastered.Server.Interfaces;
 using Wrap.Shared.Network.Packets;
+using Wrap.Shared.Network.Packets.Client;
 using Wrap.Shared.Network.Packets.Server;
 
 namespace Wrap.Remastered.Server.Handlers.PacketHandlers;
 
-public sealed class KeepAliveResponsePacketHandler : RoomPacketHandler {
+public sealed class KeepAliveResponsePacketHandler : BasePacketHandler
+{
     public KeepAliveResponsePacketHandler(IServerCoordinator server) : base(server) { }
 
     public override async Task OnHandleAsync(IChannel channel, UnsolvedPacket packet) {
@@ -21,6 +23,9 @@ public sealed class KeepAliveResponsePacketHandler : RoomPacketHandler {
 
         // 验证KeepAlive响应值
         if (connection.ValidateKeepAliveResponse(req.Value)) {
+            connection.SetKeepAliveReceivedTime(DateTime.UtcNow);
+            connection.SetPinging(false);
+            await connection.SendPacketAsync(new PingInfoPacket(connection.GetPing()));
             // 验证成功，连接保持活跃
             Server.Logger.LogDebug("KeepAlive 验证成功: {RemoteAddress}", connection.RemoteAddress);
         } else {

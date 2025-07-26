@@ -42,4 +42,11 @@ public record PeerConnectionInfo {
     public DateTime LastSentKeepAlive { get; set; } = DateTime.UtcNow;
 
     public SemaphoreSlim WriteLock { get; } = new(1, 1);
+
+    public TimeSpan GetPing()
+    {
+        if (LastSentKeepAlive == DateTime.MinValue || LastKeepAlive == DateTime.MinValue)
+            return TimeSpan.Zero;
+        return LastKeepAlive - LastSentKeepAlive;
+    }
 }

@@ -14,6 +14,9 @@ public class ChannelConnection {
     private UserInfo? _userInfo;
     private DateTime _lastActivity;
     private int? _expectedKeepAliveValue; // 期望的 KeepAlive 响应值
+    private DateTime _keepAliveSentTime; // 上次发送 KeepAlive 的时间
+    private DateTime _keepAliveReceivedTime; // 上次接收 KeepAlive 响应的时间
+    private bool _pinging;
 
     /// <summary>
     /// 通道
@@ -57,6 +60,15 @@ public class ChannelConnection {
     /// 期望的KeepAlive响应值
     /// </summary>
     public int? ExpectedKeepAliveValue => _expectedKeepAliveValue;
+    /// <summary>
+    /// 上次发送KeepAlive的时间
+    /// </summary>
+    public DateTime KeepAliveSentTime => _keepAliveSentTime;
+    /// <summary>
+    /// 上次接收KeepAlive响应的时间
+    /// </summary>
+    public DateTime KeepAliveReceivedTime => _keepAliveReceivedTime;
+    public bool Pinging => _pinging;
 
     /// <summary>
     /// 构造函数
@@ -91,6 +103,21 @@ public class ChannelConnection {
     /// <param name="value">期望的KeepAlive响应值</param>
     public void SetExpectedKeepAliveValue(int value) {
         _expectedKeepAliveValue = value;
+    }
+
+    public void SetKeepAliveSentTime(DateTime time)
+    {
+        _keepAliveSentTime = time;
+    }
+
+    public void SetKeepAliveReceivedTime(DateTime time)
+    {
+        _keepAliveReceivedTime = time;
+    }
+
+    public void SetPinging(bool pinging)
+    {
+        _pinging = pinging;
     }
 
     /// <summary>
@@ -153,5 +180,12 @@ public class ChannelConnection {
             if (IsActive)
                 _ = Channel.CloseAsync();
         } catch (Exception) {}
+    }
+
+    public TimeSpan GetPing()
+    {
+        if (Pinging) return TimeSpan.Zero;
+
+        return (_keepAliveReceivedTime - _keepAliveSentTime) / 2;
     }
 }

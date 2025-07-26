@@ -101,6 +101,7 @@ public sealed class Client : IClient, IDisposable {
     public IPEndPoint? RemoteIP { get; set; }
 
     public ILogger Logger => _logger;
+    public TimeSpan Ping {  get; private set; }
 
     /// <summary>
     /// 无参数构造函数
@@ -400,6 +401,11 @@ public sealed class Client : IClient, IDisposable {
 
     internal async Task OnPeerConnectFailedReceivedAsync(PeerConnectFailedNoticePacket packet) {
         PeerConnectFailedReceived?.Invoke(this, packet);
+    }
+
+    internal async Task OnPingInfoReceivedAsync(PingInfoPacket packet)
+    {
+        Ping = packet.Ping;
     }
 
     /// <summary>
@@ -742,5 +748,10 @@ public sealed class Client : IClient, IDisposable {
 
     internal async Task OnServerMessageReceivedAsync(ServerMessagePacket serverMessagePacket) {
         ServerMessageReceived?.Invoke(this, serverMessagePacket.Message);
+    }
+
+    public TimeSpan GetPing()
+    {
+        return Ping;
     }
 }

@@ -34,6 +34,7 @@ public interface IClient {
     IPEndPoint? PublicEndPoint { get; }
     IPEndPoint? RemoteIP { get; set; }
     IUPnPService? UPnPService { get; set; }
+    TimeSpan Ping { get; }
     string? UserId { get; }
 
     event EventHandler? Connected;

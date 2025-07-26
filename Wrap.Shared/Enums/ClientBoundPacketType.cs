@@ -19,5 +19,6 @@ public enum ClientBoundPacketType {
     PeerIPInfoPacket,
     PeerConnectFailedNoticePacket,
     PluginMessage,
-    ServerMessagePacket
+    ServerMessagePacket,
+    PingInfoPacket
 }

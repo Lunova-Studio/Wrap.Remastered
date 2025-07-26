@@ -598,4 +598,15 @@ public class PeerConnectionManager : IDisposable {
 
         _connections.Clear();
     }
+
+    public TimeSpan GetPing(string userid)
+    {
+        var connection = GetConnection(userid);
+        if (connection == null)
+        {
+            return TimeSpan.Zero;
+        }
+
+        return connection.GetPing();
+    }
 }

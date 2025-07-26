@@ -171,8 +171,11 @@ public sealed class ServerCoordinator : IServerCoordinator {
             var connections = _connectionManager.GetAllConnections()
                 .ToList();
 
-            foreach (var connection in connections)
+            foreach (var connection in connections){
                 connection.SetExpectedKeepAliveValue(keepAliveValue);
+                connection.SetPinging(true);
+                connection.SetKeepAliveSentTime(DateTime.UtcNow);
+            }
 
             await _connectionManager.BroadcastToUsersAsync(keepAlivePacket);
         } catch (OperationCanceledException) {

@@ -23,7 +23,8 @@ public interface IClientBoundPacket : IPacket {
         { ClientBoundPacketType.PeerIPInfoPacket, new PeerIPInfoPacketSerializer() },
         { ClientBoundPacketType.PeerConnectFailedNoticePacket, new PeerConnectFailedNoticePacketSerializer() },
         { ClientBoundPacketType.PluginMessage, new PluginMessagePacketSerializer() },
-        { ClientBoundPacketType.ServerMessagePacket, new ServerMessagePacketSerializer() }
+        { ClientBoundPacketType.ServerMessagePacket, new ServerMessagePacketSerializer() },
+        { ClientBoundPacketType.PingInfoPacket, new PingInfoPacketSerializer() }
     };
 
     ClientBoundPacketType GetPacketType();

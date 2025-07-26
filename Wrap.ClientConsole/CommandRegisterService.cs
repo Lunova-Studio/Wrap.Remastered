@@ -79,12 +79,14 @@ public sealed class CommandRegisterService : BackgroundService {
         _commandManager.RegisterCommandExecuter(new RoomCommand(_client));
         _commandManager.RegisterCommandExecuter(new UserCommand(_client));
         _commandManager.RegisterCommandExecuter(new HelpCommand(_client, _commandManager));
+        _commandManager.RegisterCommandExecuter(new PingCommand(_client));
 
         // 注册标签页补全器
         _commandManager.RegisterCommandTabCompleter(new RoomCommand(_client));
         _commandManager.RegisterCommandTabCompleter(new UserCommand(_client));
         _commandManager.RegisterCommandTabCompleter(new ConnectCommand(_client));
         _commandManager.RegisterCommandTabCompleter(new HelpCommand(_client, _commandManager));
+        _commandManager.RegisterCommandTabCompleter(new PingCommand(_client));
     }
 
     private void OnCommandReceived(object? sender, string command) {

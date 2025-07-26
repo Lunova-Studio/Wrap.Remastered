@@ -169,6 +169,10 @@ public class ClientHandler : ChannelHandlerAdapter {
                     else if (packet is ServerMessagePacket serverMessagePacket) {
                         await _client.OnServerMessageReceivedAsync(serverMessagePacket);
                     }
+                    else if (packet is PingInfoPacket pingInfoPacket)
+                    {
+                        await _client.OnPingInfoReceivedAsync(pingInfoPacket);
+                    }
                 }
             }
         } catch (Exception) {
